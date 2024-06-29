@@ -210,6 +210,7 @@ class QuadrupedEnv(gym.Env):
               qpos: np.ndarray = None,
               qvel: np.ndarray = None,
               seed: int | None = None,
+              random: bool = True,
               options: dict[str, Any] | None = None) -> np.ndarray:
         """Reset the environment.
 
@@ -236,20 +237,21 @@ class QuadrupedEnv(gym.Env):
         if qpos is None and qvel is None:  # Random initialization around xml keyframe 0
             mujoco.mj_resetDataKeyframe(self.mjModel, self.mjData, 0)
             # Add white noise to the joint-space position and velocity
-            q_pos_amp = 25 * np.pi / 180
-            q_vel_amp = 0.1
-            self.mjData.qpos[7:] += np.random.uniform(-q_pos_amp, q_pos_amp, self.mjModel.nq - 7)
-            self.mjData.qvel[6:] += np.random.uniform(-q_vel_amp, q_vel_amp, self.mjModel.nv - 6)
-            # Random orientation
-            ori_xyzw = Rotation.from_euler('xyz',
-                                           [np.random.uniform(-10 * np.pi / 180, 10 * np.pi / 180),
-                                            np.random.uniform(-10 * np.pi / 180, 10 * np.pi / 180),
-                                            np.random.uniform(-np.pi, np.pi)]).as_quat(canonical=True)
-            ori_wxyz = np.roll(ori_xyzw, 1)
-            self.mjData.qpos[3:7] = ori_wxyz
-            # Random xy position withing a 2 x 2 square
-            self.mjData.qpos[0:2] = np.random.uniform(-2, 2, 2)
-            self.mjData.qpos[2] = self.hip_height + np.random.uniform(-0.2 * self.hip_height, 0.2 * self.hip_height)
+            if random:
+                q_pos_amp = 35 * np.pi / 180
+                q_vel_amp = 0.1
+                self.mjData.qpos[7:] += np.random.uniform(-q_pos_amp, q_pos_amp, self.mjModel.nq - 7)
+                self.mjData.qvel[6:] += np.random.uniform(-q_vel_amp, q_vel_amp, self.mjModel.nv - 6)
+                # Random orientation
+                ori_xyzw = Rotation.from_euler('xyz',
+                                               [np.random.uniform(-15 * np.pi / 180, 15 * np.pi / 180),
+                                                np.random.uniform(-15 * np.pi / 180, 15 * np.pi / 180),
+                                                np.random.uniform(-np.pi, np.pi)]).as_quat(canonical=True)
+                ori_wxyz = np.roll(ori_xyzw, 1)
+                self.mjData.qpos[3:7] = ori_wxyz
+                # Random xy position withing a 2 x 2 square
+                self.mjData.qpos[0:2] = np.random.uniform(-2, 2, 2)
+                self.mjData.qpos[2] = self.hip_height + np.random.uniform(-0.2 * self.hip_height, 0.2 * self.hip_height)
 
             # Perform a forward dynamics computation to update the contact information
             mujoco.mj_step1(self.mjModel, self.mjData)
@@ -591,6 +593,26 @@ class QuadrupedEnv(gym.Env):
             return contact_state, feet_contacts, feet_contact_forces
 
         return contact_state, feet_contacts
+
+    @property
+    def legs_mass_matrix(self,):
+        mass_matrix = np.zeros((self.mjModel.nv, self.mjModel.nv))
+        mujoco.mj_fullM(self.mjModel, mass_matrix, self.mjData.qM)
+        # Get the mass matrix of the legs
+        legs_mass_matrix = LegsAttr(FL=mass_matrix[np.ix_(self.legs_qvel_idx.FL, self.legs_qvel_idx.FL)],
+                                    FR=mass_matrix[np.ix_(self.legs_qvel_idx.FR, self.legs_qvel_idx.FR)],
+                                    RL=mass_matrix[np.ix_(self.legs_qvel_idx.RL, self.legs_qvel_idx.RL)],
+                                    RR=mass_matrix[np.ix_(self.legs_qvel_idx.RR, self.legs_qvel_idx.RR)])
+        return legs_mass_matrix
+
+    @property
+    def legs_qfrc_bias(self,):
+        # centrifugal, coriolis, gravity
+        legs_qfrc_bias = LegsAttr(FL=self.mjData.qfrc_bias[self.legs_qvel_idx.FL],
+                                  FR=self.mjData.qfrc_bias[self.legs_qvel_idx.FR],
+                                  RL=self.mjData.qfrc_bias[self.legs_qvel_idx.RL],
+                                  RR=self.mjData.qfrc_bias[self.legs_qvel_idx.RR])
+        return legs_qfrc_bias
 
     @property
     def com(self):
