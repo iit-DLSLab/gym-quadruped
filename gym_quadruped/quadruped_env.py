@@ -17,7 +17,7 @@ from mujoco import MjData, MjModel
 from scipy.spatial.transform import Rotation
 
 from gym_quadruped.utils.math_utils import homogenous_transform
-from gym_quadruped.utils.mujoco_utils.visual import change_robot_appearance, render_vector
+from gym_quadruped.utils.mujoco.visual import change_robot_appearance, render_ghost_robot, render_vector
 from gym_quadruped.utils.quadruped_utils import LegsAttr, extract_mj_joint_info
 
 BASE_OBS = ['base_pos', 'base_lin_vel', 'base_ang_vel', 'base_ori_euler_xyz', 'base_ori_quat_wxyz', 'base_ori_SO3']
@@ -114,7 +114,8 @@ class QuadrupedEnv(gym.Env):
             raise ValueError(f"Error loading the scene {model_file_path}:") from e
 
         self.mjData: MjData = mujoco.MjData(self.mjModel)
-        # self.ghost_mjData: MjData = mujoco.MjData(self.mjModel)
+        # MjData structure to compute and store the state of a ghost/transparent robot for visual rendering.
+        self._ghost_mjData: MjData = mujoco.MjData(self.mjModel)
 
         # Set the simulation step size (dt)
         self.mjModel.opt.timestep = sim_dt
@@ -169,7 +170,7 @@ class QuadrupedEnv(gym.Env):
         # Reference base velocity in "Horizontal" frame (see heading_orientation_SO3)
         self._ref_base_lin_vel_H, self._ref_base_ang_yaw_dot = None, None
         # Store the ids of visual aid geometries
-        self._geom_ids = {}
+        self._geom_ids, self._ghost_robots_geom = {}, {}
 
     def step(self, action) -> tuple[np.ndarray, float, bool, bool, dict]:
         """Apply the action to the robot, evolve the simulation, and return the observation, reward, and termination.
@@ -230,6 +231,7 @@ class QuadrupedEnv(gym.Env):
         self.mjData.time = 0.0
         self.mjData.ctrl = 0.0  # Reset control signals
         self.mjData.qfrc_applied = 0.0
+        options = {} if options is None else options
 
         if seed is not None: np.random.seed(seed)  # Set seed for reproducibility
 
@@ -238,14 +240,16 @@ class QuadrupedEnv(gym.Env):
             mujoco.mj_resetDataKeyframe(self.mjModel, self.mjData, 0)
             # Add white noise to the joint-space position and velocity
             if random:
-                q_pos_amp = 35 * np.pi / 180
+                q_pos_amp = 35 * np.pi / 180 if 'angle_sweep' not in options else options['angle_sweep']
                 q_vel_amp = 0.1
                 self.mjData.qpos[7:] += np.random.uniform(-q_pos_amp, q_pos_amp, self.mjModel.nq - 7)
                 self.mjData.qvel[6:] += np.random.uniform(-q_vel_amp, q_vel_amp, self.mjModel.nv - 6)
                 # Random orientation
+                roll_sweep = 20 * np.pi / 180 if 'roll_sweep' not in options else options['roll_sweep']
+                pitch_sweep = 20 * np.pi / 180 if 'pitch_sweep' not in options else options['pitch_sweep']
                 ori_xyzw = Rotation.from_euler('xyz',
-                                               [np.random.uniform(-15 * np.pi / 180, 15 * np.pi / 180),
-                                                np.random.uniform(-15 * np.pi / 180, 15 * np.pi / 180),
+                                               [np.random.uniform(-roll_sweep, roll_sweep),
+                                                np.random.uniform(-pitch_sweep, pitch_sweep),
                                                 np.random.uniform(-np.pi, np.pi)]).as_quat(canonical=True)
                 ori_wxyz = np.roll(ori_xyzw, 1)
                 self.mjData.qpos[3:7] = ori_wxyz
@@ -302,15 +306,17 @@ class QuadrupedEnv(gym.Env):
 
         return self._get_obs()
 
-    def render(self, mode='human', ghost_configs=None, tint_robot=False):
-        X_B = self.base_configuration
-        r_B = X_B[:3, 3]
-        dr_B = self.mjData.qvel[0:3]
-        ref_base_lin_vel_B, _ = self.target_base_vel()
-        ref_vec_pos, vec_pos = r_B + [0, 0, 0.1], r_B + [0, 0, 0.15]
-        ref_vel_vec_color, vel_vec_color = np.array([1, 0.5, 0, .7]), np.array([0, 1, 1, .7])
-        ref_vec_scale, vec_scale = np.linalg.norm(ref_base_lin_vel_B) / 1.0, np.linalg.norm(dr_B) / 1.0
+    def render(self, mode='human', tint_robot=False, ghost_qpos=None, ghost_alpha=0.5):
+        """ Render the environment.
 
+        Args:
+            mode: (str) The rendering mode. Only 'human' is supported. TODO: rgb frame.
+            tint_robot: (bool) Whether to tint the robot with a color.
+            ghost_qpos: (nq,) or (n_robot, nq) array with the joint positions of the ghost robots.
+            ghost_alpha: (float) or (n_robot,) array of alpha value of the ghost robots.
+        Returns:
+
+        """
         if self.viewer is None:
             self.viewer = mujoco.viewer.launch_passive(
                 self.mjModel, self.mjData, show_left_ui=False, show_right_ui=False,
@@ -320,41 +326,46 @@ class QuadrupedEnv(gym.Env):
 
             mujoco.mjv_defaultFreeCamera(self.mjModel, self.viewer.cam)
             self.viewer.user_scn.flags[mujoco.mjtRndFlag.mjRND_SHADOW] = 0
-            # self.viewer.user_scn.flags[mujoco.mjtRndFlag.mjRND_REFLECTION] = 0
-            # Define markers for visualization of desired and current base velocity
-            self._geom_ids['ref_dr_B_vec'] = render_vector(
-                self.viewer, vector=ref_base_lin_vel_B, pos=ref_vec_pos, scale=ref_vec_scale, color=ref_vel_vec_color
-                )
-            self._geom_ids['dr_B_vec'] = render_vector(
-                self.viewer, vector=dr_B, pos=vec_pos, scale=vec_scale, color=vel_vec_color,
-                )
+            self.viewer.user_scn.flags[mujoco.mjtRndFlag.mjRND_REFLECTION] = 0
 
-        else:
-            # Update the reference and current base linear velocity markers
-            render_vector(self.viewer, ref_base_lin_vel_B, ref_vec_pos, ref_vec_scale, ref_vel_vec_color,
-                          geom_id=self._geom_ids['ref_dr_B_vec'])
-            render_vector(self.viewer, dr_B, vec_pos, vec_scale, vel_vec_color,
-                          geom_id=self._geom_ids['dr_B_vec'])
+        # Define/Update markers for visualization of desired and current base velocity _______________________________
+        X_B = self.base_configuration
+        base_pos = X_B[:3, 3]
+        base_lin_vel = self.mjData.qvel[0:3]
+        ref_base_lin_vel_B, _ = self.target_base_vel()
+        ref_vec_pos, vec_pos = base_pos + [0, 0, 0.1], base_pos + [0, 0, 0.15]
+        ref_vel_vec_color, vel_vec_color = np.array([1, 0.5, 0, .7]), np.array([0, 1, 1, .7])
+        ref_vec_scale, vec_scale = np.linalg.norm(ref_base_lin_vel_B) / 1.0, np.linalg.norm(base_lin_vel) / 1.0
 
-        # # Ghost robot rendering
-        # if ghost_configs is not None:
-        #     self.ghost_mjData.qpos, self.ghost_mjData.qvel = ghost_configs
-        #     mujoco.mj_forward(self.mjModel, self.ghost_mjData)
-        #     self._geom_ids |= render_ghost_robot(self.viewer, self.mjModel, self.ghost_mjData, alpha=0.5,
-        #                                          ghost_geom_ids=self._geom_ids)
+        ref_vec_id, vec_id = self._geom_ids.get('ref_dr_B_vec', -1), self._geom_ids.get('dr_B_vec', -1)
+        self._geom_ids['ref_dr_B_vec'] = render_vector(
+            self.viewer, ref_base_lin_vel_B, pos=ref_vec_pos, scale=ref_vec_scale, color=ref_vel_vec_color,
+            geom_id=ref_vec_id
+            )
+        self._geom_ids['dr_B_vec'] = render_vector(
+            self.viewer, base_lin_vel, pos=vec_pos, scale=vec_scale, color=vel_vec_color,
+            geom_id=vec_id
+            )
 
-        cam_pos = max(self.hip_height * 0.1, r_B[2])
-        self._update_camera_target(self.viewer.cam, np.concatenate((r_B[:2], [cam_pos])))
+        # Ghost robot rendering _______________________________________________________________________________________
+        if ghost_qpos is not None:
+            self._render_ghost_robots(qpos=ghost_qpos, alpha=ghost_alpha)
+
+        # Update the camera position. _________________________________________________________________________________
+        cam_pos = max(self.hip_height * 0.1, base_pos[2])
+        self._update_camera_target(self.viewer.cam, np.concatenate((base_pos[:2], [cam_pos])))
+
+        # Finally, sync the viewer with the data. # TODO: if render mode is rgb, return the frame.
         self.viewer.sync()
-        # if self.step_num == 0:
-        #     time.sleep(0.5)
-        # print("Rendered")
 
-    def close(self):
-        """Close the viewer."""
-        if self.viewer is not None:
-            self.viewer.close()
-            self.viewer = None
+    def target_base_vel(self):
+        """Returns the target base linear (3,) and angular (3,) velocity in the world reference frame."""
+        if self._ref_base_lin_vel_H is None:
+            raise RuntimeError("Please call env.reset() before accessing the target base velocity.")
+        R_B_heading = self.heading_orientation_SO3
+        ref_base_lin_vel = (R_B_heading @ self._ref_base_lin_vel_H.reshape(3, 1)).squeeze()
+        ref_base_ang_vel = np.array([0., 0., self._ref_base_ang_yaw_dot])
+        return ref_base_lin_vel, ref_base_ang_vel
 
     def hip_positions(self, frame='world') -> LegsAttr:
         """Get the hip positions in the specified frame.
@@ -388,15 +399,6 @@ class QuadrupedEnv(gym.Env):
             RR=R.T @ self.mjData.body(RR_hip_id).xpos,
             RL=R.T @ self.mjData.body(RL_hip_id).xpos,
             )
-
-    def target_base_vel(self):
-        """Returns the target base linear (3,) and angular (3,) velocity in the world reference frame."""
-        if self._ref_base_lin_vel_H is None:
-            raise RuntimeError("Please call env.reset() before accessing the target base velocity.")
-        R_B_heading = self.heading_orientation_SO3
-        ref_base_lin_vel = (R_B_heading @ self._ref_base_lin_vel_H.reshape(3, 1)).squeeze()
-        ref_base_ang_vel = np.array([0., 0., self._ref_base_ang_yaw_dot])
-        return ref_base_lin_vel, ref_base_ang_vel
 
     def get_base_inertia(self) -> np.ndarray:
         """Returns the reflected rotational inertia of the robot's base at the current configuration in world frame.
@@ -448,7 +450,6 @@ class QuadrupedEnv(gym.Env):
             RL=homogenous_transform(self.mjData.geom_xpos[self._feet_geom_id.RL], X),
             )
 
-    # LegsAttr(**{leg_name: feet_jac[leg_name] @ env.mjData.qvel for leg_name in legs_order})
     def feet_vel(self, frame='world') -> LegsAttr:
         """Get the feet velocities in the specified frame.
 
@@ -594,8 +595,14 @@ class QuadrupedEnv(gym.Env):
 
         return contact_state, feet_contacts
 
+    def close(self):
+        """Close the viewer."""
+        if self.viewer is not None:
+            self.viewer.close()
+            self.viewer = None
+
     @property
-    def legs_mass_matrix(self,):
+    def legs_mass_matrix(self, ):
         mass_matrix = np.zeros((self.mjModel.nv, self.mjModel.nv))
         mujoco.mj_fullM(self.mjModel, mass_matrix, self.mjData.qM)
         # Get the mass matrix of the legs
@@ -606,7 +613,7 @@ class QuadrupedEnv(gym.Env):
         return legs_mass_matrix
 
     @property
-    def legs_qfrc_bias(self,):
+    def legs_qfrc_bias(self, ):
         # centrifugal, coriolis, gravity
         legs_qfrc_bias = LegsAttr(FL=self.mjData.qfrc_bias[self.legs_qvel_idx.FL],
                                   FR=self.mjData.qfrc_bias[self.legs_qvel_idx.FR],
@@ -727,79 +734,6 @@ class QuadrupedEnv(gym.Env):
         # Reward could be based on distance traveled, energy efficiency, etc.
         return 0
 
-    def _check_for_invalid_contacts(self) -> [bool, dict]:
-        """Env termination occurs when a contact is detected on the robot's base."""
-        invalid_contacts = {}
-        invalid_contact_detected = False
-        for contact in self.mjData.contact:
-            # Get body IDs from geom IDs
-            body1_id = self.mjModel.geom_bodyid[contact.geom1]
-            body2_id = self.mjModel.geom_bodyid[contact.geom2]
-
-            if 0 in [body1_id, body2_id]:  # World body ID is 0
-                second_id = body2_id if body1_id == 0 else body1_id
-                if second_id not in self._feet_body_id.to_list():  # Check if contact occurs with anything but the feet
-                    # Get body names from body IDs
-                    body1_name = mujoco.mj_id2name(self.mjModel, mujoco.mjtObj.mjOBJ_BODY, body1_id)
-                    body2_name = mujoco.mj_id2name(self.mjModel, mujoco.mjtObj.mjOBJ_BODY, body2_id)
-                    invalid_contacts[f"{body1_name}:{body1_id}_{body2_name}:{body2_id}"] = contact
-                    invalid_contact_detected = True
-            else:  # Contact between two bodies of the robot
-                pass  # Do nothing for now
-
-        return invalid_contact_detected, invalid_contacts  # No invalid contact detected
-
-    def _get_geom_body_info(self, geom_name: str = None, geom_id: int = None) -> [int, str]:
-        """Returns the body ID and name associated with the geometry name or ID."""
-        assert geom_name is not None or geom_id is not None, "Please provide either the geometry name or ID."
-        if geom_name is not None:
-            geom_id = mujoco.mj_name2id(self.mjModel, mujoco.mjtObj.mjOBJ_GEOM, geom_name)
-
-        body_id = self.mjModel.geom_bodyid[geom_id]
-        body_name = mujoco.mj_id2name(self.mjModel, mujoco.mjtObj.mjOBJ_BODY, body_id)
-
-        return body_id, body_name
-
-    # Function to update the camera position
-    def _update_camera_target(self, cam, target_point: np.ndarray):
-        cam.lookat[:] = target_point  # Update the camera lookat point to the target point
-        # Potentially do other fancy stuff.
-        pass
-
-    def _set_ground_friction(self,
-                             tangential_coeff: float = 1.0,  # Default MJ tangential coefficient
-                             torsional_coeff: float = 0.005,  # Default MJ torsional coefficient
-                             rolling_coeff: float = 0.0  # Default MJ rolling coefficient
-                             ):
-        """Initialize ground friction coefficients using a specified distribution."""
-        pass
-        for geom_id in range(self.mjModel.ngeom):
-            geom_name = mujoco.mj_id2name(self.mjModel, mujoco.mjtObj.mjOBJ_GEOM, geom_id)
-            if geom_name and geom_name.lower() in ['ground', 'floor', 'hfield', "terrain"]:
-                self.mjModel.geom_friction[geom_id, :] = [tangential_coeff, torsional_coeff, rolling_coeff]
-                print(f"Setting friction for {geom_name} to: {tangential_coeff, torsional_coeff, rolling_coeff}")
-            elif geom_id in self._feet_geom_id:  # Set the same friction coefficients for the feet geometries
-                self.mjModel.geom_friction[geom_id, :] = [tangential_coeff, torsional_coeff, rolling_coeff]
-            else:
-                pass
-
-    def _key_callback(self, keycode):
-        print(f"\n\n ********************* Key pressed: {keycode}\n\n\n")
-        if keycode == 262:  # arrow right
-            self._ref_base_ang_yaw_dot -= np.pi / 6
-        elif keycode == 263:  # arrow left
-            self._ref_base_ang_yaw_dot += np.pi / 6
-        elif keycode == 265:  # arrow up
-            self._ref_base_lin_vel_H[0] += 0.25 * self.hip_height  # % of (hip_height / second)
-        elif keycode == 264:  # arrow down
-            self._ref_base_lin_vel_H[0] -= 0.25 * self.hip_height  # % of (hip_height / second)
-        elif keycode == 345:  # ctrl
-            self._ref_base_lin_vel_H *= 0.0
-            self._ref_base_ang_yaw_dot = 0.0
-
-        self._ref_base_ang_yaw_dot = np.clip(self._ref_base_ang_yaw_dot, -2 * np.pi, 2 * np.pi)
-        self._ref_base_lin_vel_H[0] = np.clip(self._ref_base_lin_vel_H[0], -6 * self.hip_height, 6 * self.hip_height)
-
     def _get_obs(self):
         """Returns the state observation based on the specified state observation names."""
         obs = []
@@ -850,6 +784,110 @@ class QuadrupedEnv(gym.Env):
         assert state_obs.shape == self.observation_space.shape, \
             f"Invalid state observation shape: {state_obs.shape}, expected: {self.observation_space.shape}"
         return state_obs
+
+    def _check_for_invalid_contacts(self) -> [bool, dict]:
+        """Env termination occurs when a contact is detected on the robot's base."""
+        invalid_contacts = {}
+        invalid_contact_detected = False
+        for contact in self.mjData.contact:
+            # Get body IDs from geom IDs
+            body1_id = self.mjModel.geom_bodyid[contact.geom1]
+            body2_id = self.mjModel.geom_bodyid[contact.geom2]
+
+            if 0 in [body1_id, body2_id]:  # World body ID is 0
+                second_id = body2_id if body1_id == 0 else body1_id
+                if second_id not in self._feet_body_id.to_list():  # Check if contact occurs with anything but the feet
+                    # Get body names from body IDs
+                    body1_name = mujoco.mj_id2name(self.mjModel, mujoco.mjtObj.mjOBJ_BODY, body1_id)
+                    body2_name = mujoco.mj_id2name(self.mjModel, mujoco.mjtObj.mjOBJ_BODY, body2_id)
+                    invalid_contacts[f"{body1_name}:{body1_id}_{body2_name}:{body2_id}"] = contact
+                    invalid_contact_detected = True
+            else:  # Contact between two bodies of the robot
+                pass  # Do nothing for now
+
+        return invalid_contact_detected, invalid_contacts  # No invalid contact detected
+
+    def _get_geom_body_info(self, geom_name: str = None, geom_id: int = None) -> [int, str]:
+        """Returns the body ID and name associated with the geometry name or ID."""
+        assert geom_name is not None or geom_id is not None, "Please provide either the geometry name or ID."
+        if geom_name is not None:
+            geom_id = mujoco.mj_name2id(self.mjModel, mujoco.mjtObj.mjOBJ_GEOM, geom_name)
+
+        body_id = self.mjModel.geom_bodyid[geom_id]
+        body_name = mujoco.mj_id2name(self.mjModel, mujoco.mjtObj.mjOBJ_BODY, body_id)
+
+        return body_id, body_name
+
+    def _update_camera_target(self, cam, target_point: np.ndarray):
+        cam.lookat[:] = target_point  # Update the camera lookat point to the target point
+        # Potentially do other fancy stuff.
+        pass
+
+    # Function to update the camera position
+
+    def _set_ground_friction(self,
+                             tangential_coeff: float = 1.0,  # Default MJ tangential coefficient
+                             torsional_coeff: float = 0.005,  # Default MJ torsional coefficient
+                             rolling_coeff: float = 0.0  # Default MJ rolling coefficient
+                             ):
+        """Initialize ground friction coefficients using a specified distribution."""
+        pass
+        for geom_id in range(self.mjModel.ngeom):
+            geom_name = mujoco.mj_id2name(self.mjModel, mujoco.mjtObj.mjOBJ_GEOM, geom_id)
+            if geom_name and geom_name.lower() in ['ground', 'floor', 'hfield', "terrain"]:
+                self.mjModel.geom_friction[geom_id, :] = [tangential_coeff, torsional_coeff, rolling_coeff]
+                # print(f"Setting friction for {geom_name} to: {tangential_coeff, torsional_coeff, rolling_coeff}")
+            elif geom_id in self._feet_geom_id:  # Set the same friction coefficients for the feet geometries
+                self.mjModel.geom_friction[geom_id, :] = [tangential_coeff, torsional_coeff, rolling_coeff]
+            else:
+                pass
+
+    def _render_ghost_robots(self, qpos: np.ndarray, alpha: float | np.ndarray = 0.5):
+        """ Render ghost robots with the provided qpos configurations.
+
+        :param qpos: (n_robots, nq) or (nq,) array with the joint positions of the ghost robots.
+        :param alpha: (float) or (n_robots,) array with the transparency of the ghost robots.
+        """
+        qp = np.asarray(qpos)
+        if qp.ndim == 2:
+            assert qp.shape[1] == self.mjModel.nq, f"Invalid qpos shape: (...,{qp.shape[1]}) != {self.mjModel.nq}"
+            alpha = [alpha] * qp.shape[0] if isinstance(alpha, float) else alpha
+        else:
+            qp = qp.reshape(1, -1)
+            alpha = [alpha]
+
+        for ghost_robot_idx, (q, a) in enumerate(zip(qp, alpha)):
+            # Use forward kinematics to update the geometry positions
+            if ghost_robot_idx not in self._ghost_robots_geom:
+                self._ghost_robots_geom[ghost_robot_idx] = {}
+
+            self._ghost_mjData.qpos = q
+            self._ghost_mjData.qvel *= 0.0
+            mujoco.mj_forward(self.mjModel, self._ghost_mjData)
+            self._ghost_robots_geom[ghost_robot_idx] |= render_ghost_robot(
+                self.viewer,
+                self.mjModel,
+                self._ghost_mjData,
+                alpha=a,
+                ghost_geoms=self._ghost_robots_geom.get(ghost_robot_idx, {})
+                )
+
+    def _key_callback(self, keycode):
+        # print(f"\n\n ********************* Key pressed: {keycode}\n\n\n")
+        if keycode == 262:  # arrow right
+            self._ref_base_ang_yaw_dot -= np.pi / 6
+        elif keycode == 263:  # arrow left
+            self._ref_base_ang_yaw_dot += np.pi / 6
+        elif keycode == 265:  # arrow up
+            self._ref_base_lin_vel_H[0] += 0.25 * self.hip_height  # % of (hip_height / second)
+        elif keycode == 264:  # arrow down
+            self._ref_base_lin_vel_H[0] -= 0.25 * self.hip_height  # % of (hip_height / second)
+        elif keycode == 345:  # ctrl
+            self._ref_base_lin_vel_H *= 0.0
+            self._ref_base_ang_yaw_dot = 0.0
+
+        self._ref_base_ang_yaw_dot = np.clip(self._ref_base_ang_yaw_dot, -2 * np.pi, 2 * np.pi)
+        self._ref_base_lin_vel_H[0] = np.clip(self._ref_base_lin_vel_H[0], -6 * self.hip_height, 6 * self.hip_height)
 
     def _configure_observation_space(self, state_obs_names: list[str]) -> [spaces.Space, dict[str, slice]]:
         """Configures the observation space for the environment based on the provided state observation names.
@@ -967,6 +1005,10 @@ class QuadrupedEnv(gym.Env):
         observation_space = spaces.Box(low=obs_lim_min, high=obs_lim_max, shape=(obs_dim,), dtype=np.float32)
         return observation_space, obs_idx
 
+    def _save_hyperparameters(self, constructor_params):
+        self._init_args = constructor_params
+        [self._init_args.pop(k) for k in ['self', '__class__']]  # Remove 'self' and '__class__
+
     def __str__(self):
         """Returns a description of the environment task configuration."""
         msg = f"robot={self._init_args['robot']} terrain={self._init_args['scene']} task={self.base_vel_command_type}"
@@ -978,10 +1020,6 @@ class QuadrupedEnv(gym.Env):
                     f" lat_friction_range=({self.ground_friction_coeff_range[0]:.1e}, "
                     f"{self.ground_friction_coeff_range[1]:.1e})")
         return msg
-
-    def _save_hyperparameters(self, constructor_params):
-        self._init_args = constructor_params
-        [self._init_args.pop(k) for k in ['self', '__class__']]  # Remove 'self' and '__class__
 
 
 # Example usage:
@@ -1008,14 +1046,25 @@ if __name__ == '__main__':
                        state_obs_names=state_observables_names,  # Desired quantities in the 'state'
                        )
     obs = env.reset()
+    env.render(tint_robot=True)
+    for _ in range(10):
+        obs = env.reset()
+        for _ in range(20000):
+            qpos, qvel = env.mjData.qpos, env.mjData.qvel
 
-    env.render()
-    for _ in range(10000):
-        action = env.action_space.sample() * 50  # Sample random action
-        state, reward, is_terminated, is_truncated, info = env.step(action=action)
+            action = env.action_space.sample() * 50  # Sample random action
+            state, reward, is_terminated, is_truncated, info = env.step(action=action)
 
-        if is_terminated:
-            pass
-            # Do some stuff
-        env.render()
+            if is_terminated:
+                pass
+                # Handle terminal states here. Terminal states are contacts with ground with any geom but feet.
+
+            # The environment enables also to visualize ghost robot configurations for debugging purposes.
+            # These ghost/decorative robots are not simulated, rather only displayed in the viewer.
+            # These robot's config are given by a qpos array.
+            qpos_ghost1, qpos_ghost2 = np.array(qpos), np.array(qpos)
+            qpos_ghost1[0] += 1.0
+            qpos_ghost2[0] -= 1.0
+            env.render(ghost_qpos=(qpos_ghost1, qpos_ghost2), ghost_alpha=(0.1, 0.5))
+
     env.close()
