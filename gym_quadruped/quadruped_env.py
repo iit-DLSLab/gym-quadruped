@@ -44,7 +44,6 @@ class QuadrupedEnv(gym.Env):
                  robot: str,
                  hip_height: float,
                  legs_joint_names: dict,
-                 feet_geom_name: dict,
                  state_obs_names: tuple[str, ...] = _DEFAULT_OBS,
                  scene: str = 'flat',
                  sim_dt: float = 0.002,
@@ -53,6 +52,7 @@ class QuadrupedEnv(gym.Env):
                  ref_base_ang_vel: Union[tuple[float, float], float] = 0.0,  # [rad/s]
                  ground_friction_coeff: Union[tuple[float, float], float] = 1.0,
                  legs_order: tuple[str, str, str, str] = ('FL', 'FR', 'RL', 'RR'),
+                 feet_geom_name: dict = None,
                  ):
         """Initialize the quadruped environment.
 
@@ -62,8 +62,6 @@ class QuadrupedEnv(gym.Env):
             hip_height: Nominal height of the robot's hip from the ground.
             legs_joint_names: (dict) Dict with keys FL, FR, RL, RR; and as values a list of joint names associated with
                 each of the four legs.
-            feet_geom_name: (dict) Dict with keys FL, FR, RL, RR; and as values the name of the Mujoco geometry (Geom)
-                associated with the feet/contact-point of each leg. Used to compute the ground contact forces.
             state_obs_names: (tuple) Names of the state observations to include in the observation space.
             scene: Name of the ground terrain, available are 'flat', 'perlin', TODO: more
             sim_dt: Time step of the mujoco simulation.
@@ -83,6 +81,8 @@ class QuadrupedEnv(gym.Env):
                 coefficient is fixed. If a tuple, (min, max) the friction coefficient is uniformly sampled from this
             legs_order: (tuple) Default order of the legs in the state observation and action space. This order defines
                 how state observations of legs observables (e.g., feet positions) are ordered in the state vector.
+            feet_geom_name: (dict) Dict with keys FL, FR, RL, RR; and as values the name of the Mujoco geometry
+                (MjvGeom) associated with the feet/contact-point of each leg. Used to compute the ground contact forces.
         """
         super(QuadrupedEnv, self).__init__()
 
@@ -125,7 +125,7 @@ class QuadrupedEnv(gym.Env):
         self.joint_info = extract_mj_joint_info(self.mjModel)
         self.legs_qpos_idx = LegsAttr(None, None, None, None)  # Indices of legs joints in qpos vector
         self.legs_qvel_idx = LegsAttr(None, None, None, None)  # Indices of legs joints in qvel vector
-        self.legs_tau_idx = LegsAttr(None, None, None, None)  # Indices of legs actuators in gen forces vector
+        self.legs_tau_idx = LegsAttr(None, None, None, None)   # Indices of legs actuators in gen forces vector
         # Ensure the joint names of the robot's legs' joints are in the model. And store the qpos and qvel indices
         for leg_name in ["FR", "FL", "RR", "RL"]:
             qpos_idx, qvel_idx, tau_idx = [], [], []
@@ -139,6 +139,11 @@ class QuadrupedEnv(gym.Env):
             self.legs_qvel_idx[leg_name] = qvel_idx
             self.legs_tau_idx[leg_name] = tau_idx
 
+        # If the feet geometry names are provided, store the geom ids and body ids of the feet geometries _____________
+        self._feet_geom_id, self._feet_body_id = LegsAttr(None, None, None, None), LegsAttr(None, None, None, None)
+        if feet_geom_name is not None:
+            self._find_feet_model_attrs(feet_geom_name)
+
         # Action space: Torque values for each joint _________________________________________________________________
         tau_low, tau_high = self.mjModel.actuator_forcerange[:, 0], self.mjModel.actuator_forcerange[:, 1]
         is_act_lim = [np.inf if not lim else 1.0 for lim in self.mjModel.actuator_forcelimited]
@@ -148,22 +153,10 @@ class QuadrupedEnv(gym.Env):
             high=np.asarray([tau if not lim else np.inf for tau, lim in zip(tau_high, is_act_lim)]),
             dtype=np.float32)
 
-        # Observation space: _______________________________________
+        # Observation space: __________________________________________________________________________________________
         # Get the Env observation gym.Space, and a dict with the indices of each observation in the state vector
         self.observation_space, self.state_obs_idx = self._configure_observation_space(state_obs_names)
         self.state_obs_names = state_obs_names
-
-        # Check the provided feet geometry and body names are within the model. These are used to compute the Jacobians
-        # of the feet positions.
-        self._feet_geom_id = LegsAttr(None, None, None, None)
-        self._feet_body_id = LegsAttr(None, None, None, None)
-        _all_geoms = [mujoco.mj_id2name(self.mjModel, i, mujoco.mjtObj.mjOBJ_GEOM) for i in range(self.mjModel.ngeom)]
-        for lef_name in ["FR", "FL", "RR", "RL"]:
-            foot_geom_id = mujoco.mj_name2id(self.mjModel, mujoco.mjtObj.mjOBJ_GEOM, feet_geom_name[lef_name])
-            assert foot_geom_id != -1, f"Foot GEOM {feet_geom_name[lef_name]} not found in {_all_geoms}."
-            self._feet_geom_id[lef_name] = foot_geom_id
-            foot_body_id, foot_body_name = self._get_geom_body_info(geom_id=foot_geom_id)
-            self._feet_body_id[lef_name] = foot_body_id
 
         self.viewer = None
         self.step_num = 0
@@ -367,39 +360,6 @@ class QuadrupedEnv(gym.Env):
         ref_base_ang_vel = np.array([0., 0., self._ref_base_ang_yaw_dot])
         return ref_base_lin_vel, ref_base_ang_vel
 
-    def hip_positions(self, frame='world') -> LegsAttr:
-        """Get the hip positions in the specified frame.
-
-        Args:
-        ----
-            frame:  Either 'world' or 'base'. The reference frame in which the hip positions are computed.
-
-        Returns:
-        -------
-            LegsAttr: A dictionary-like object with:
-                - FR: (3,) position of the FR hip in the specified frame.
-                - FL: (3,) position of the FL hip in the specified frame.
-                - RR: (3,) position of the RR hip in the specified frame.
-                - RL: (3,) position of the RL hip in the specified frame.
-        """
-        if frame == 'world':
-            R = np.eye(3)
-        elif frame == 'base':
-            R = self.base_configuration[0:3, 0:3]
-        else:
-            raise ValueError(f"Invalid frame: {frame} != 'world' or 'base'")
-        # TODO: this should not be hardcoded.
-        FL_hip_id = mujoco.mj_name2id(self.mjModel, mujoco.mjtObj.mjOBJ_BODY, 'FL_hip')
-        FR_hip_id = mujoco.mj_name2id(self.mjModel, mujoco.mjtObj.mjOBJ_BODY, 'FR_hip')
-        RL_hip_id = mujoco.mj_name2id(self.mjModel, mujoco.mjtObj.mjOBJ_BODY, 'RL_hip')
-        RR_hip_id = mujoco.mj_name2id(self.mjModel, mujoco.mjtObj.mjOBJ_BODY, 'RR_hip')
-        return LegsAttr(
-            FR=R.T @ self.mjData.body(FR_hip_id).xpos,
-            FL=R.T @ self.mjData.body(FL_hip_id).xpos,
-            RR=R.T @ self.mjData.body(RR_hip_id).xpos,
-            RL=R.T @ self.mjData.body(RL_hip_id).xpos,
-            )
-
     def get_base_inertia(self) -> np.ndarray:
         """Returns the reflected rotational inertia of the robot's base at the current configuration in world frame.
 
@@ -421,6 +381,39 @@ class QuadrupedEnv(gym.Env):
 
         return inertia_B_at_qpos
 
+    def hip_positions(self, frame='world') -> LegsAttr:
+        """Get the hip positions in the specified frame.
+
+        Args:
+        ----
+            frame:  Either 'world' or 'base'. The reference frame in which the hip positions are computed.
+
+        Returns:
+        -------
+            LegsAttr: A dictionary-like object with:
+                - FR: (3,) position of the FR hip in the specified frame.
+                - FL: (3,) position of the FL hip in the specified frame.
+                - RL: (3,) position of the RL hip in the specified frame.
+                - RR: (3,) position of the RR hip in the specified frame.
+        """
+        if frame == 'world':
+            R = np.eye(3)
+        elif frame == 'base':
+            R = self.base_configuration[0:3, 0:3]
+        else:
+            raise ValueError(f"Invalid frame: {frame} != 'world' or 'base'")
+        # TODO: Name of bodies should not be hardcodd
+        FL_hip_id = mujoco.mj_name2id(self.mjModel, mujoco.mjtObj.mjOBJ_BODY, 'FL_hip')
+        FR_hip_id = mujoco.mj_name2id(self.mjModel, mujoco.mjtObj.mjOBJ_BODY, 'FR_hip')
+        RL_hip_id = mujoco.mj_name2id(self.mjModel, mujoco.mjtObj.mjOBJ_BODY, 'RL_hip')
+        RR_hip_id = mujoco.mj_name2id(self.mjModel, mujoco.mjtObj.mjOBJ_BODY, 'RR_hip')
+        return LegsAttr(
+            FR=R.T @ self.mjData.body(FR_hip_id).xpos,
+            FL=R.T @ self.mjData.body(FL_hip_id).xpos,
+            RR=R.T @ self.mjData.body(RR_hip_id).xpos,
+            RL=R.T @ self.mjData.body(RL_hip_id).xpos,
+            )
+
     def feet_pos(self, frame='world') -> LegsAttr:
         """Get the feet positions in the specified frame.
 
@@ -436,6 +429,11 @@ class QuadrupedEnv(gym.Env):
                 - RR: (3,) position of the RR foot in the specified frame.
                 - RL: (3,) position of the RL foot in the specified frame.
         """
+        if any(x is None for x in self._feet_geom_id.to_list()):
+            raise ValueError(
+                "Please provide the `feet_geom_name` argument in the Env constructor to compute feet positions."
+                )
+
         if frame == 'world':
             X = np.eye(4)
         elif frame == 'base':
@@ -501,6 +499,11 @@ class QuadrupedEnv(gym.Env):
                 - The first LegsAttr object contains the translational Jacobians as described above.
                 - The second LegsAttr object contains the rotational Jacobians.
         """
+        if any(x is None for x in self._feet_body_id.to_list()):
+            raise ValueError(
+                "Please provide the `feet_geom_name` argument in the Env constructor to compute feet Jacobians."
+                )
+
         if frame == 'world':
             R = np.eye(3)
         elif frame == 'base':
@@ -554,6 +557,12 @@ class QuadrupedEnv(gym.Env):
                     - RL: (3,) The total ground reaction force acting on the RL foot in the specified frame.
                     - RR: (3,) The total ground reaction force acting on the RR foot in the specified frame.
         """
+
+        if any(x is None for x in self._feet_body_id.to_list()):
+            raise ValueError(
+                "Please provide the `feet_geom_name` argument in the Env constructor to compute contact forces."
+                )
+
         contact_state = LegsAttr(FL=False, FR=False, RL=False, RR=False)
         feet_contacts = LegsAttr(FL=[], FR=[], RL=[], RR=[])
         feet_contact_forces = LegsAttr(FL=[], FR=[], RL=[], RR=[])
@@ -1008,6 +1017,15 @@ class QuadrupedEnv(gym.Env):
     def _save_hyperparameters(self, constructor_params):
         self._init_args = constructor_params
         [self._init_args.pop(k) for k in ['self', '__class__']]  # Remove 'self' and '__class__
+
+    def _find_feet_model_attrs(self, feet_geom_name):
+        _all_geoms = [mujoco.mj_id2name(self.mjModel, i, mujoco.mjtObj.mjOBJ_GEOM) for i in range(self.mjModel.ngeom)]
+        for lef_name in ["FR", "FL", "RR", "RL"]:
+            foot_geom_id = mujoco.mj_name2id(self.mjModel, mujoco.mjtObj.mjOBJ_GEOM, feet_geom_name[lef_name])
+            assert foot_geom_id != -1, f"Foot GEOM {feet_geom_name[lef_name]} not found in {_all_geoms}."
+            self._feet_geom_id[lef_name] = foot_geom_id
+            foot_body_id, foot_body_name = self._get_geom_body_info(geom_id=foot_geom_id)
+            self._feet_body_id[lef_name] = foot_body_id
 
     def __str__(self):
         """Returns a description of the environment task configuration."""
