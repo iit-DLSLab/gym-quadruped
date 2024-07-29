@@ -1,10 +1,7 @@
-import sys
-sys.path.append("../gym_quadruped")
-sys.path.append("../gym_quadruped/utils")
-
-from quadruped_env import QuadrupedEnv
-from Camera.Camera_Mujoco import Camera
 import cv2
+
+from gym_quadruped.quadruped_env import QuadrupedEnv
+from gym_quadruped.sensors.rgbd_camera import Camera
 
 robot_name = "aliengo"   # "aliengo", "mini_cheetah", "go2", "hyqreal", ...
 scene_name = "flat"

@@ -1,9 +1,10 @@
 import mujoco as mj
-import numpy as np 
+import numpy as np
 import os
-from Camera.utils import make_tf
 import cv2
 from datetime import datetime
+
+from scipy.spatial.transform import Rotation
 
 
 class Camera:
@@ -21,9 +22,9 @@ class Camera:
         self._model = model
         self._data = data
         self._save_dir = save_dir + self._cam_name + "/"
-        self.save_counter =0
-        self.interval = float(1/fps)
-        self.last_time = float(data.time) # in seconds
+        self.save_counter = 0
+        self.interval = float(1 / fps)
+        self.last_time = float(data.time)  # in seconds
 
         self._width = width
         self._height = height
@@ -44,10 +45,9 @@ class Camera:
         self._last_point_cloud = np.zeros((self._height, self._width, 1), dtype=np.float32)
 
         timestamp = str(datetime.now())
-        timestamp = timestamp.replace(":","_").replace(" ","_")
+        timestamp = timestamp.replace(":", "_").replace(" ", "_")
 
-        self._save_dir = os.path.join(self._save_dir,"data_" + timestamp)
-    #===================================================================
+        self._save_dir = os.path.join(self._save_dir, "data_" + timestamp)
 
     @property
     def height(self) -> int:
@@ -58,7 +58,8 @@ class Camera:
                 int: The height of the camera.
         """
         return self._height
-    #===================================================================
+
+    # ===================================================================
     @property
     def width(self) -> int:
         """
@@ -68,7 +69,8 @@ class Camera:
                 int: The width of the camera.
         """
         return self._width
-    #====================================================================  
+
+    # ====================================================================
     @property
     def last_sim_time(self) -> float:
         """
@@ -78,9 +80,10 @@ class Camera:
                 int: The last simulation time.
         """
         return self.last_time
-    #====================================================================
+
+    # ====================================================================
     @last_sim_time.setter
-    def last_sim_time(self,time) -> None:
+    def last_sim_time(self, time) -> None:
         """
         Set the last simulation time, in seconds, from camera function call.
 
@@ -88,7 +91,8 @@ class Camera:
                 None
         """
         self.last_time = time
-    #====================================================================
+
+    # ====================================================================
     @property
     def save_dir(self) -> str:
         """
@@ -98,7 +102,8 @@ class Camera:
                 str: The directory where images captured by the camera are saved.
         """
         return self._save_dir
-    #====================================================================
+
+    # ====================================================================
     @property
     def name(self) -> str:
         """
@@ -108,9 +113,10 @@ class Camera:
                 str: The name of the camera.s
         """
         return self._cam_name
-    #====================================================================
+
+    # ====================================================================
     @property
-    def K(self) -> np.ndarray:
+    def intrinsic_mat(self) -> np.ndarray:
         """
         Compute the intrinsic camera matrix (K) based on the camera's field of view (fov),
         width (_width), and height (_height) parameters, following the pinhole camera model.
@@ -137,13 +143,13 @@ class Camera:
         K = np.array([[alpha_u, 0, u_0], [0, alpha_v, v_0], [0, 0, 1]])
 
         return K
-    #=====================================================================
-    @property
-    def T_world_cam(self) -> np.ndarray:
-        """
-        Compute the homogeneous transformation matrix for the camera.
 
-        The transformation matrix is computed from the camera's position and orientation.
+    @property
+    def frame_config(self) -> np.ndarray:
+        """
+        Compute the camera configuration (an homogeneous transformation matrix) in world coordinates.
+
+        The transformation matrix is computed from the camera's position and orientation in world coordinates.
         The position and orientation are retrieved from the camera data.
 
         Returns:
@@ -151,11 +157,13 @@ class Camera:
         """
         pos = self._data.cam(self._cam_id).xpos
         rot = self._data.cam(self._cam_id).xmat.reshape(3, 3).T
-        T = make_tf(pos=pos, ori=rot).A
+        T = np.eye(4)
+        T[:3, :3] = Rotation.from_matrix(rot)
+        T[:3, 3] = pos
         return T
-    #=======================================================================
+
     @property
-    def P(self) -> np.ndarray:
+    def projection_mat(self) -> np.ndarray:
         """
         Compute the projection matrix for the camera.
 
@@ -165,8 +173,8 @@ class Camera:
         Returns:
         np.ndarray: The 3x4 projection matrix.
         """
-        return self.K @ self.T_world_cam
-    #======================================================================
+        return self.intrinsic_mat @ self.frame_config
+
     @property
     def image(self) -> np.ndarray:
         """Return the captured RGB image."""
@@ -174,16 +182,16 @@ class Camera:
         self._image = self._renderer.render()
         self._last_image = self._image
         return self._image
-    #======================================================================
+
     @property
     def depth_image(self) -> np.ndarray:
-        """Return the captured depth image."""        
+        """Return the captured depth image."""
         self._renderer.update_scene(self._data, camera=self.name)
         self._renderer.enable_depth_rendering()
         self._depth_image = self._renderer.render()
         self._renderer.disable_depth_rendering()
         return self._depth_image
-    #======================================================================
+
     @property
     def seg_image(self) -> np.ndarray:
         """Return the captured segmentation image based on object's id."""
@@ -192,17 +200,17 @@ class Camera:
 
         self._seg_id_image = self._renderer.render()[:, :, 0].reshape(
             (self.height, self.width)
-        )
+            )
         self._renderer.disable_segmentation_rendering()
         self._last_seg_id_image = self._seg_id_image
         return self._seg_id_image
-    #=====================================================================
+
     @property
     def point_cloud(self) -> np.ndarray:
         """Return the captured point cloud."""
         self._point_cloud = self._depth_to_point_cloud(self.depth_image)
         return self._point_cloud
-    #======================================================================
+
     @property
     def fov(self) -> float:
         """Get the field of view (FOV) of the camera.
@@ -211,7 +219,7 @@ class Camera:
         - float: The field of view angle in degrees.
         """
         return self._model.cam(self._cam_id).fovy[0]
-    #======================================================================
+
     @property
     def id(self) -> int:
         """Get the identifier of the camera.
@@ -220,7 +228,7 @@ class Camera:
         - int: The identifier of the camera.
         """
         return self._cam_id
-    #=======================================================================
+
     def _depth_to_point_cloud(self, depth_image: np.ndarray) -> np.ndarray:
         """
         Method to convert depth image to a point cloud in camera coordinates.
@@ -251,7 +259,7 @@ class Camera:
         homogeneous_coords = np.vstack((x_flat, y_flat, np.ones_like(x_flat)))
 
         # Compute inverse of the intrinsic matrix K
-        K_inv = np.linalg.inv(self.K)
+        K_inv = np.linalg.inv(self.intrinsic_mat)
 
         # Calculate 3D points in camera coordinates
         points_camera = np.dot(K_inv, homogeneous_coords) * depth_flat
@@ -265,8 +273,8 @@ class Camera:
         points_camera = points_camera[:, :3] / points_camera[:, 3][:, np.newaxis]
 
         return points_camera
-    #=====================================================================
-    def shoot(self, autosave: bool = True, img= True, depth=True, seg= True) -> None:
+
+    def shoot(self, autosave: bool = True, img=True, depth=True, seg=True) -> None:
         """
         Captures a new rgb image, depth image and point cloud from the camera.
         Args:
@@ -281,8 +289,8 @@ class Camera:
         self._seg_image = self.seg_image
         if autosave:
             self.save(img=img, depth=depth, seg=seg)
-    #=====================================================================
-    def save(self, img_name: str = "", img: bool= False, depth:bool =False, seg:bool= False) -> None:
+
+    def save(self, img_name: str = "", img: bool = False, depth: bool = False, seg: bool = False) -> None:
         """Saves the captured image and depth information.
 
         Args:
@@ -294,29 +302,26 @@ class Camera:
             os.makedirs(os.path.join(self._save_dir, "images"))
 
         ptr_string = "saving "
-        if(img): ptr_string += "rgb image "
-        if(depth): ptr_string+= "depth image "
-        if(seg): ptr_string+= "segmentation image "
-        ptr_string+= f"to {self.save_dir}"
+        if img: ptr_string += "rgb image "
+        if depth: ptr_string += "depth image "
+        if seg: ptr_string += "segmentation image "
+        ptr_string += f"to {self.save_dir}"
 
         print(ptr_string)
 
         if img_name == "":
-            
-            if(img):cv2.imwrite(
+
+            if img: cv2.imwrite(
                 self._save_dir + f"img_{self.save_counter}.png",
                 cv2.cvtColor(self.image, cv2.COLOR_RGB2BGR),
-            )
-            if(seg):cv2.imwrite(self._save_dir + f"seg_{self.save_counter}.png", self.seg_image)
-            if(depth): np.save(self._save_dir + "/images/"+ f"depth_{self.save_counter}.npy", self.depth_image)
-            #pcwrite(self._save_dir + f"{timestamp}.pcd", self.point_cloud)
-            self.save_counter+=1
-
+                )
+            if seg: cv2.imwrite(self._save_dir + f"seg_{self.save_counter}.png", self.seg_image)
+            if depth: np.save(self._save_dir + "/images/" + f"depth_{self.save_counter}.npy", self.depth_image)
+            self.save_counter += 1
         else:
-            if(img):cv2.imwrite(
+            if img: cv2.imwrite(
                 self._save_dir + f"{img_name}_rgb.png",
                 cv2.cvtColor(self.image, cv2.COLOR_RGB2BGR),
-            )
-            if(seg): cv2.imwrite(self._save_dir + f"{img_name}_seg.png", self.seg_image)
-            if(depth): np.save(self._save_dir + "/images/" +f"{img_name}_depth.npy", self.depth_image)
-            #pcwrite(self._save_dir + f"{img_name}.pcd", self.point_cloud)
+                )
+            if seg: cv2.imwrite(self._save_dir + f"{img_name}_seg.png", self.seg_image)
+            if depth: np.save(self._save_dir + "/images/" + f"{img_name}_depth.npy", self.depth_image)
