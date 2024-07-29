@@ -143,18 +143,6 @@ class JointInfo:
         return f"{', '.join([f'{key}={getattr(self, key)}' for key in self.__dict__.keys()])}"
 
 
-class GaitType(Enum):
-    """Enumeration class to represent the different gaits that a quadruped robot can perform."""
-
-    TROT = 0
-    PACE = 1
-    BOUNDING = 2
-    CIRCULARCRAWL = 3
-    BFDIAGONALCRAWL = 4
-    BACKDIAGONALCRAWL = 5
-    FRONTDIAGONALCRAWL = 6
-    FULL_STANCE = 7
-
 
 def extract_mj_joint_info(model: mujoco.MjModel) -> OrderedDict[str, JointInfo]:
     """Returns the joint-space information of the model.
