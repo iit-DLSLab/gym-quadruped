@@ -105,6 +105,7 @@ class QuadrupedEnv(gym.Env):
         dir_path = os.path.dirname(os.path.realpath(__file__))
         base_path = Path(dir_path) / 'robot_model' / robot
         model_file_path = base_path / f'scene_{scene}.xml'
+        print(model_file_path)
         assert model_file_path.exists(), f"Model file not found: {model_file_path.absolute().resolve()}"
 
         # Load the robot and scene to mujoco
@@ -708,6 +709,16 @@ class QuadrupedEnv(gym.Env):
     def simulation_time(self):
         """Returns the simulation time in seconds."""
         return self.mjData.time
+    
+    @property
+    def robot_model(self):
+        """Returns the Robot model."""
+        return self.mjModel
+
+    @property
+    def sim_data(self):
+        """Returns the simulation Data."""
+        return self.mjData
 
     def extract_obs_from_state(self, state_like_array: np.ndarray) -> namedtuple:
         """Extracts the state observation from a state-like array.
