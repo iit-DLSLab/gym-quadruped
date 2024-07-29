@@ -804,7 +804,7 @@ class QuadrupedEnv(gym.Env):
             elif 'base_lin_acc' in obs_name:
                 frame = 'world' if not obs_name.endswith('base') else 'base'
                 obs.append(self.base_lin_acc(frame))
-            elif obs_name == 'base_ang_vel':
+            elif 'base_ang_vel' in obs_name:
                 frame = 'world' if not obs_name.endswith('base') else 'base'
                 obs.append(self.base_ang_vel(frame=frame))
             elif obs_name == 'base_ori_euler_xyz':
@@ -1000,7 +1000,7 @@ class QuadrupedEnv(gym.Env):
                 obs_dim += 3
                 obs_lim_max.extend([np.inf] * 3)
                 obs_lim_min.extend([-np.inf] * 3)
-            elif obs_name == 'base_ang_vel':
+            elif 'base_ang_vel' in obs_name:
                 if "qvel" in state_obs_names:
                     warnings.warn("base_ang_vel is redundant with additional obs qvel. base_ang_vel = qvel[3:6]")
                 obs_dim += 3
