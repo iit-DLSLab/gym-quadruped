@@ -20,10 +20,14 @@ from gym_quadruped.utils.math_utils import homogenous_transform
 from gym_quadruped.utils.mujoco.visual import change_robot_appearance, render_ghost_robot, render_vector
 from gym_quadruped.utils.quadruped_utils import LegsAttr, extract_mj_joint_info
 
-BASE_OBS = ['base_pos', 'base_lin_vel', 'base_ang_vel', 'base_ori_euler_xyz', 'base_ori_quat_wxyz', 'base_ori_SO3']
+BASE_OBS = ['base_pos',
+            'base_lin_vel', 'base_lin_vel:base',
+            'base_lin_acc', 'base_lin_acc:base',
+            'base_ang_vel', 'base_ang_vel:base',
+            'base_ori_euler_xyz', 'base_ori_quat_wxyz', 'base_ori_SO3']
 GEN_COORDS_OBS = ['qpos', 'qvel', 'tau_ctrl_setpoint', 'qpos_js', 'qvel_js']
-FEET_OBS = ['feet_pos', 'feet_pos_base', 'feet_vel', 'feet_vel_base', 'contact_state', 'contact_forces',
-            'contact_forces_base']
+FEET_OBS = ['feet_pos', 'feet_pos:base', 'feet_vel', 'feet_vel:base', 'contact_state', 'contact_forces',
+            'contact_forces:base']
 
 
 class QuadrupedEnv(gym.Env):
@@ -214,6 +218,7 @@ class QuadrupedEnv(gym.Env):
             qpos: (np.ndarray) Initial joint positions. If None, random initialization around keyframe 0.
             qvel: (np.ndarray) Initial joint velocities. If None, random initialization around keyframe 0.
             seed: (int) Seed for reproducibility.
+            random: (bool) Whether to randomize the initial state.
             options: (dict) Additional options for the reset.
 
         Returns:
@@ -234,13 +239,13 @@ class QuadrupedEnv(gym.Env):
             mujoco.mj_resetDataKeyframe(self.mjModel, self.mjData, 0)
             # Add white noise to the joint-space position and velocity
             if random:
-                q_pos_amp = 35 * np.pi / 180 if 'angle_sweep' not in options else options['angle_sweep']
+                q_pos_amp = 25 * np.pi / 180 if 'angle_sweep' not in options else options['angle_sweep']
                 q_vel_amp = 0.1
                 self.mjData.qpos[7:] += np.random.uniform(-q_pos_amp, q_pos_amp, self.mjModel.nq - 7)
                 self.mjData.qvel[6:] += np.random.uniform(-q_vel_amp, q_vel_amp, self.mjModel.nv - 6)
                 # Random orientation
-                roll_sweep = 20 * np.pi / 180 if 'roll_sweep' not in options else options['roll_sweep']
-                pitch_sweep = 20 * np.pi / 180 if 'pitch_sweep' not in options else options['pitch_sweep']
+                roll_sweep = 10 * np.pi / 180 if 'roll_sweep' not in options else options['roll_sweep']
+                pitch_sweep = 10 * np.pi / 180 if 'pitch_sweep' not in options else options['pitch_sweep']
                 ori_xyzw = Rotation.from_euler('xyz',
                                                [np.random.uniform(-roll_sweep, roll_sweep),
                                                 np.random.uniform(-pitch_sweep, pitch_sweep),
@@ -249,7 +254,15 @@ class QuadrupedEnv(gym.Env):
                 self.mjData.qpos[3:7] = ori_wxyz
                 # Random xy position withing a 2 x 2 square
                 self.mjData.qpos[0:2] = np.random.uniform(-2, 2, 2)
-                self.mjData.qpos[2] = self.hip_height + np.random.uniform(-0.2 * self.hip_height, 0.2 * self.hip_height)
+
+                try:
+                    feet_pos = self.feet_pos(frame='world')
+                    max_z = np.max([pos[2] for pos in feet_pos.to_list()])
+                    self.mjData.qpos[2] -= max_z
+                except ValueError as e:
+                    self.mjData.qpos[2] = self.hip_height + np.random.uniform(-0.05 * self.hip_height,
+                                                                              0.05 * self.hip_height)
+
 
             # Perform a forward dynamics computation to update the contact information
             mujoco.mj_step1(self.mjModel, self.mjData)
@@ -360,6 +373,36 @@ class QuadrupedEnv(gym.Env):
         ref_base_lin_vel = (R_B_heading @ self._ref_base_lin_vel_H.reshape(3, 1)).squeeze()
         ref_base_ang_vel = np.array([0., 0., self._ref_base_ang_yaw_dot])
         return ref_base_lin_vel, ref_base_ang_vel
+
+    def base_lin_vel(self, frame='world'):
+        """Returns the base linear velocity (3,) in the specified frame."""
+        if frame == 'world':
+            return self.mjData.qvel[0:3]
+        elif frame == 'base':
+            R = self.base_configuration[0:3, 0:3]
+            return R.T @ self.mjData.qvel[0:3]
+        else:
+            raise ValueError(f"Invalid frame: {frame} != 'world' or 'base'")
+
+    def base_ang_vel(self, frame='world'):
+        """Returns the base angular velocity (3,) in the specified frame."""
+        if frame == 'world':
+            return self.mjData.qvel[3:6]
+        elif frame == 'base':
+            R = self.base_configuration[0:3, 0:3]
+            return R.T @ self.mjData.qvel[3:6]
+        else:
+            raise ValueError(f"Invalid frame: {frame} != 'world' or 'base'")
+        
+    def base_lin_acc(self, frame='world'):
+        """Returns the base linear acceleration (3,) [m/s^2] in the specified frame."""
+        if frame == 'world':
+            return self.mjData.qacc[0:3]
+        elif frame == 'base':
+            R = self.base_configuration[0:3, 0:3]
+            return R.T @ self.mjData.qacc[0:3]
+        else:
+            raise ValueError(f"Invalid frame: {frame} != 'world' or 'base'")
 
     def get_base_inertia(self) -> np.ndarray:
         """Returns the reflected rotational inertia of the robot's base at the current configuration in world frame.
@@ -666,16 +709,6 @@ class QuadrupedEnv(gym.Env):
         return self.mjData.qpos[0:3]
 
     @property
-    def base_lin_vel(self):
-        """Returns the base linear velocity (3,) in the world reference frame."""
-        return self.mjData.qvel[0:3]
-
-    @property
-    def base_ang_vel(self):
-        """Returns the base angular velocity (3,) in the world reference frame."""
-        return self.mjData.qvel[3:6]
-
-    @property
     def base_ori_euler_xyz(self):
         """Returns the base orientation in Euler XYZ angles (roll, pitch, yaw) in the world reference frame."""
         quat_wxyz = self.mjData.qpos[3:7]
@@ -720,7 +753,7 @@ class QuadrupedEnv(gym.Env):
         """Returns the simulation Data."""
         return self.mjData
 
-    def extract_obs_from_state(self, state_like_array: np.ndarray) -> namedtuple:
+    def extract_obs_from_state(self, state_like_array: np.ndarray) -> dict[str, np.ndarray]:
         """Extracts the state observation from a state-like array.
 
         Parameters
@@ -731,23 +764,15 @@ class QuadrupedEnv(gym.Env):
 
         Returns
         -------
-        namedtuple
-            A namedtuple with the entries corresponding to each of the state observation
-            names, and their corresponding (..., obs_name_dimension) arrays.
-
-        Example
-        -------
-        >>> env = QuadrupedEnv(state_obs_names=['base_pos', 'qpos_js'])
-        >>> state = np.random.rand(env.observation_space.shape[0])
-        >>> state_obs = env.extract_obs_from_state(state)
-        >>> print(state_obs.base_pos)
-        >>> print(state_obs.qpos_js)
+        state_obs_dict: (dict) A dictionary with the state observation names as keys and the corresponding
+            state observation values as values.
         """
         state_obs_shape = self.observation_space.shape
         assert state_like_array.shape[-len(state_obs_shape):] == self.observation_space.shape, \
             f"Invalid state vector shape: {state_like_array.shape}, expected: (...{self.observation_space.shape})"
-        StateObs = namedtuple('StateObs', self.state_obs_names)
-        return StateObs(*[state_like_array[..., idx] for idx in self.state_obs_idx.values()])
+        state_obs_dict = {}
+        # return StateObs(*[state_like_array[..., idx] for idx in self.state_obs_idx.values()])
+        return {obs_name: state_like_array[..., idx] for obs_name, idx in self.state_obs_idx.items()}
 
     def _compute_reward(self):
         # Example reward function (to be defined based on the task)
@@ -773,10 +798,15 @@ class QuadrupedEnv(gym.Env):
             # Base position and velocity configurations (in world frame)
             elif obs_name == 'base_pos':
                 obs.append(self.base_pos)
-            elif obs_name == 'base_lin_vel':
-                obs.append(self.base_lin_vel)
+            elif 'base_lin_vel' in obs_name:
+                frame = 'world' if not obs_name.endswith('base') else 'base'
+                obs.append(self.base_lin_vel(frame))
+            elif 'base_lin_acc' in obs_name:
+                frame = 'world' if not obs_name.endswith('base') else 'base'
+                obs.append(self.base_lin_acc(frame))
             elif obs_name == 'base_ang_vel':
-                obs.append(self.base_ang_vel)
+                frame = 'world' if not obs_name.endswith('base') else 'base'
+                obs.append(self.base_ang_vel(frame=frame))
             elif obs_name == 'base_ori_euler_xyz':
                 obs.append(self.base_ori_euler_xyz)
             elif obs_name == 'base_ori_quat_wxyz':
@@ -960,9 +990,13 @@ class QuadrupedEnv(gym.Env):
                 obs_dim += 3
                 obs_lim_max.extend([np.inf] * 3)
                 obs_lim_min.extend([-np.inf] * 3)
-            elif obs_name == 'base_lin_vel':
+            elif 'base_lin_vel' in obs_name:  # base_lin_vel / base_lin_vel:base (base frame)
                 if "qvel" in state_obs_names:
                     warnings.warn("base_lin_vel is redundant with additional obs qvel. base_lin_vel = qvel[0:3]")
+                obs_dim += 3
+                obs_lim_max.extend([np.inf] * 3)
+                obs_lim_min.extend([-np.inf] * 3)
+            elif 'base_lin_acc' in obs_name:  # base_lin_acc / base_lin_acc:base (base frame)
                 obs_dim += 3
                 obs_lim_max.extend([np.inf] * 3)
                 obs_lim_min.extend([-np.inf] * 3)
@@ -1066,12 +1100,12 @@ if __name__ == '__main__':
 
     env = QuadrupedEnv(robot='mini_cheetah',
                        hip_height=0.25,
-                       legs_joint_names=robot_leg_joints,  # Joint names of the legs DoF
-                       feet_geom_name=robot_feet_geom_names,  # Geom/Frame id of feet
+                       legs_joint_names=robot_leg_joints,        # Joint names of the legs DoF
+                       feet_geom_name=robot_feet_geom_names,     # Geom/Frame id of feet
                        scene=scene_name,
-                       ref_base_lin_vel=(0.5, 1.0),  # pass a float for a fixed value
-                       ground_friction_coeff=(0.2, 1.5),  # pass a float for a fixed value
-                       base_vel_command_type="random",  # "forward", "random", "forward+rotate", "human"
+                       ref_base_lin_vel=(0.5, 1.0),              # pass a float for a fixed value
+                       ground_friction_coeff=(0.2, 1.5),         # pass a float for a fixed value
+                       base_vel_command_type="random",           # "forward", "random", "forward+rotate", "human"
                        state_obs_names=state_observables_names,  # Desired quantities in the 'state'
                        )
     obs = env.reset()
@@ -1083,6 +1117,11 @@ if __name__ == '__main__':
 
             action = env.action_space.sample() * 50  # Sample random action
             state, reward, is_terminated, is_truncated, info = env.step(action=action)
+
+            state_dict = env.extract_obs_from_state(state)
+            for state_obs_name in state_observables_names:
+                assert state_obs_name in state_dict, f"Missing state observation: {state_obs_name}"
+                assert state_dict[state_obs_name] is not None, f"Invalid state observation: {state_obs_name}"
 
             if is_terminated:
                 pass
