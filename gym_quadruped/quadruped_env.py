@@ -20,7 +20,10 @@ from gym_quadruped.utils.math_utils import homogenous_transform
 from gym_quadruped.utils.mujoco.visual import change_robot_appearance, render_ghost_robot, render_vector
 from gym_quadruped.utils.quadruped_utils import LegsAttr, extract_mj_joint_info
 
-BASE_OBS = ['base_pos', 'base_lin_vel', 'base_lin_acc', 'base_lin_vel:base', 'base_lin_acc:base', 'base_ang_vel',
+BASE_OBS = ['base_pos',
+            'base_lin_vel', 'base_lin_vel:base',
+            'base_lin_acc', 'base_lin_acc:base',
+            'base_ang_vel', 'base_ang_vel:base',
             'base_ori_euler_xyz', 'base_ori_quat_wxyz', 'base_ori_SO3']
 GEN_COORDS_OBS = ['qpos', 'qvel', 'tau_ctrl_setpoint', 'qpos_js', 'qvel_js']
 FEET_OBS = ['feet_pos', 'feet_pos:base', 'feet_vel', 'feet_vel:base', 'contact_state', 'contact_forces',
@@ -380,6 +383,16 @@ class QuadrupedEnv(gym.Env):
         else:
             raise ValueError(f"Invalid frame: {frame} != 'world' or 'base'")
 
+    def base_ang_vel(self, frame='world'):
+        """Returns the base angular velocity (3,) in the specified frame."""
+        if frame == 'world':
+            return self.mjData.qvel[3:6]
+        elif frame == 'base':
+            R = self.base_configuration[0:3, 0:3]
+            return R.T @ self.mjData.qvel[3:6]
+        else:
+            raise ValueError(f"Invalid frame: {frame} != 'world' or 'base'")
+        
     def base_lin_acc(self, frame='world'):
         """Returns the base linear acceleration (3,) [m/s^2] in the specified frame."""
         if frame == 'world':
@@ -695,11 +708,6 @@ class QuadrupedEnv(gym.Env):
         return self.mjData.qpos[0:3]
 
     @property
-    def base_ang_vel(self):
-        """Returns the base angular velocity (3,) [rad/s] in the world reference frame in Euler XYZ angles."""
-        return self.mjData.qvel[3:6]
-
-    @property
     def base_ori_euler_xyz(self):
         """Returns the base orientation in Euler XYZ angles (roll, pitch, yaw) in the world reference frame."""
         quat_wxyz = self.mjData.qpos[3:7]
@@ -786,7 +794,8 @@ class QuadrupedEnv(gym.Env):
                 frame = 'world' if not obs_name.endswith('base') else 'base'
                 obs.append(self.base_lin_acc(frame))
             elif obs_name == 'base_ang_vel':
-                obs.append(self.base_ang_vel)
+                frame = 'world' if not obs_name.endswith('base') else 'base'
+                obs.append(self.base_ang_vel(frame=frame))
             elif obs_name == 'base_ori_euler_xyz':
                 obs.append(self.base_ori_euler_xyz)
             elif obs_name == 'base_ori_quat_wxyz':
