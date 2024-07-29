@@ -39,6 +39,7 @@
             <geom size="0.0005 0.0005 0.0005" type="box" contype="0" conaffinity="0" group="1" rgba="0.8 0 0 0" />
             <geom size="0.0005 0.0005 0.0005" type="box" rgba="0.8 0 0 0" />
             <site name="imu" pos="0 0 0"/>
+            <camera name="robotcam" pos="0.31 -0.005 0.00292751" quat= "0.4 0.4 -0.4 -0.4"/> 
 
 
             <body name="FL_hip" pos="0.2399 0.051 0">
