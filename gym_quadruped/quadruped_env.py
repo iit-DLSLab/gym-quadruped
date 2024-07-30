@@ -109,6 +109,7 @@ class QuadrupedEnv(gym.Env):
         dir_path = os.path.dirname(os.path.realpath(__file__))
         base_path = Path(dir_path) / 'robot_model' / robot
         model_file_path = base_path / f'scene_{scene}.xml'
+        print(model_file_path)
         assert model_file_path.exists(), f"Model file not found: {model_file_path.absolute().resolve()}"
 
         # Load the robot and scene to mujoco
@@ -741,6 +742,16 @@ class QuadrupedEnv(gym.Env):
     def simulation_time(self):
         """Returns the simulation time in seconds."""
         return self.mjData.time
+    
+    @property
+    def robot_model(self):
+        """Returns the Robot model."""
+        return self.mjModel
+
+    @property
+    def sim_data(self):
+        """Returns the simulation Data."""
+        return self.mjData
 
     def extract_obs_from_state(self, state_like_array: np.ndarray) -> dict[str, np.ndarray]:
         """Extracts the state observation from a state-like array.
@@ -793,7 +804,7 @@ class QuadrupedEnv(gym.Env):
             elif 'base_lin_acc' in obs_name:
                 frame = 'world' if not obs_name.endswith('base') else 'base'
                 obs.append(self.base_lin_acc(frame))
-            elif obs_name == 'base_ang_vel':
+            elif 'base_ang_vel' in obs_name:
                 frame = 'world' if not obs_name.endswith('base') else 'base'
                 obs.append(self.base_ang_vel(frame=frame))
             elif obs_name == 'base_ori_euler_xyz':
@@ -989,7 +1000,7 @@ class QuadrupedEnv(gym.Env):
                 obs_dim += 3
                 obs_lim_max.extend([np.inf] * 3)
                 obs_lim_min.extend([-np.inf] * 3)
-            elif obs_name == 'base_ang_vel':
+            elif 'base_ang_vel' in obs_name:
                 if "qvel" in state_obs_names:
                     warnings.warn("base_ang_vel is redundant with additional obs qvel. base_ang_vel = qvel[3:6]")
                 obs_dim += 3
