@@ -213,7 +213,7 @@ class HeightMap:
     
 
     # ====================================================================
-    def get_height(self, foot_position):
+    def get_height(self, target):
         '''
         This function is used to get the height of the terrain at the foot position
         '''
@@ -222,7 +222,7 @@ class HeightMap:
             nearest_datapoint = np.array([0, 0, 0])
             for i in range(self.n):
                 for j in range(self.n):
-                    if(np.linalg.norm(self.data[i][j][0] - foot_position) < np.linalg.norm(nearest_datapoint - foot_position)):
+                    if(np.linalg.norm(self.data[i][j][0][0:2] - target[0:2]) < np.linalg.norm(nearest_datapoint[0:2] - target[0:2])):
                         nearest_datapoint = self.data[i][j][0] + 0.02
             return nearest_datapoint[2]
 
