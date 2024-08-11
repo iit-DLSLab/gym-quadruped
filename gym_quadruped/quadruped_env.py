@@ -20,6 +20,8 @@ from gym_quadruped.utils.math_utils import homogenous_transform
 from gym_quadruped.utils.mujoco.visual import change_robot_appearance, render_ghost_robot, render_vector
 from gym_quadruped.utils.quadruped_utils import LegsAttr, extract_mj_joint_info
 
+from gym_quadruped.utils.mujoco.terrain import add_world_of_boxes
+
 BASE_OBS = ['base_pos',
             'base_lin_vel', 'base_lin_vel:base',
             'base_lin_acc', 'base_lin_acc:base',
@@ -108,9 +110,25 @@ class QuadrupedEnv(gym.Env):
         #   robot models relying on robot_descriptions.py. This way of loading the XML is not ideal.
         dir_path = os.path.dirname(os.path.realpath(__file__))
         base_path = Path(dir_path) / 'robot_model' / robot
-        model_file_path = base_path / f'scene_{scene}.xml'
-        print(model_file_path)
-        assert model_file_path.exists(), f"Model file not found: {model_file_path.absolute().resolve()}"
+        
+        # Random terrain generation
+        if scene == 'random_boxes':
+            model_file_path = base_path / f'scene_flat.xml'
+            scene = add_world_of_boxes(model_file_path,
+                                        init_pos=[0.6, -1.5, 0.02],
+                                        euler=[0, 0, 0.0],
+                                        nums=[10, 10],
+                                        separation=[0.5, 0.5])
+            model_file_path = base_path / f'scene_new.xml'
+            scene.write(model_file_path)
+
+        else:
+            model_file_path = base_path / f'scene_{scene}.xml'
+            print(model_file_path)
+            assert model_file_path.exists(), f"Model file not found: {model_file_path.absolute().resolve()}"
+
+
+
 
         # Load the robot and scene to mujoco
         try:

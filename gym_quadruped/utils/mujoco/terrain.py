@@ -94,3 +94,123 @@ def add_perlin_heightfield(
     geo.attrib["quat"] = list_to_str(quat_wxyz)
 
 
+# zyx euler angle to quaternion
+def euler_to_quat(roll, pitch, yaw):
+    cx = np.cos(roll / 2)
+    sx = np.sin(roll / 2)
+    cy = np.cos(pitch / 2)
+    sy = np.sin(pitch / 2)
+    cz = np.cos(yaw / 2)
+    sz = np.sin(yaw / 2)
+
+    return np.array(
+        [
+            cx * cy * cz + sx * sy * sz,
+            sx * cy * cz - cx * sy * sz,
+            cx * sy * cz + sx * cy * sz,
+            cx * cy * sz - sx * sy * cz,
+        ],
+        dtype=np.float64,
+    )
+
+
+# zyx euler angle to rotation matrix
+def euler_to_rot(roll, pitch, yaw):
+    rot_x = np.array(
+        [
+            [1, 0, 0],
+            [0, np.cos(roll), -np.sin(roll)],
+            [0, np.sin(roll), np.cos(roll)],
+        ],
+        dtype=np.float64,
+    )
+
+    rot_y = np.array(
+        [
+            [np.cos(pitch), 0, np.sin(pitch)],
+            [0, 1, 0],
+            [-np.sin(pitch), 0, np.cos(pitch)],
+        ],
+        dtype=np.float64,
+    )
+    rot_z = np.array(
+        [
+            [np.cos(yaw), -np.sin(yaw), 0],
+            [np.sin(yaw), np.cos(yaw), 0],
+            [0, 0, 1],
+        ],
+        dtype=np.float64,
+    )
+    return rot_z @ rot_y @ rot_x
+
+
+# 3d rotate
+def rot3d(pos, euler):
+    R = euler_to_rot(euler[0], euler[1], euler[2])
+    return R @ pos
+
+
+# Add Box to scene
+def add_box(asset: xml_et.Element,
+            worldbody: xml_et.Element,
+            position=[1.0, 0.0, 0.0],
+            euler=[0.0, 0.0, 0.0], 
+            size=[0.1, 0.1, 0.1]):
+    geo = xml_et.SubElement(worldbody, "geom")
+    geo.attrib["pos"] = list_to_str(position)
+    geo.attrib["type"] = "box"
+    geo.attrib["size"] = list_to_str(
+        0.5 * np.array(size))  # half size of box for mujoco
+    quat = euler_to_quat(euler[0], euler[1], euler[2])
+    geo.attrib["quat"] = list_to_str(quat)
+
+
+def add_world_of_boxes(model_file_path,
+                       init_pos=[1.0, 0.0, 0.0],
+                       euler=[0.0, -0.0, 0.0],
+                       nums=[10, 10],
+                       box_size=[0.5, 0.5, 0.1],
+                       box_euler=[0.0, 0.0, 0.0],
+                       separation=[0.2, 0.2],
+                       box_size_rand=[1, 1, 1],
+                       box_euler_rand=[0.2, 0.2, 0.2],
+                       separation_rand=[0, 1],
+                       random_roll_pitch=False):
+
+    scene = xml_et.parse(model_file_path)
+    root = scene.getroot()
+    worldbody = root.find("worldbody")
+    asset = root.find("asset")
+
+    #local_pos = [0.0, 0.0, -0.5 * box_size[2]]
+    local_pos = [0.0, 0.0, 0.0]
+    new_separation = np.array(separation) + np.array(
+        separation_rand) * np.random.uniform(-1.0, 1.0, 2)
+    for i in range(nums[0]):
+        local_pos[0] += new_separation[0]
+        local_pos[1] = 0.0
+        for j in range(nums[1]):
+            new_box_size_xy = np.array(box_size)[0:2] + np.array(
+                box_size_rand)[0:2] * np.random.uniform(-0.2, 0.2, 2)
+            new_box_size_z = np.array(box_size)[2] + np.array(
+                box_size_rand)[2] * np.random.uniform(-0.1, 0.15, 1)
+            new_box_size = np.array([new_box_size_xy[0], new_box_size_xy[1], new_box_size_z[0]])
+            
+            if random_roll_pitch:
+                new_box_euler = np.array(box_euler) + np.array(
+                    box_euler_rand) * np.random.uniform(-1.0, 1.0, 3)
+            else:
+                new_box_euler = np.array(box_euler) 
+                new_box_euler[2] = new_box_euler[2] + np.array(
+                    box_euler_rand)[2] * np.random.uniform(-1, 1, 1)                
+            
+            new_separation_x = np.array(separation)[0] + np.array(
+                separation_rand)[0] * np.random.uniform(0, 0.5, 1)
+            new_separation_y = np.array(separation)[1] + np.array(
+                separation_rand)[1] * np.random.uniform(-0.5, 0.5, 1)
+            new_separation = np.array([new_separation_x[0], new_separation_y[0]])
+
+            local_pos[1] += new_separation[1]
+            pos = rot3d(local_pos, euler) + np.array(init_pos)
+            add_box(asset, worldbody, pos, new_box_euler, new_box_size)
+    return scene
