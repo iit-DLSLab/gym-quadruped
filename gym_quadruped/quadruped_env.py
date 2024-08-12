@@ -111,7 +111,7 @@ class QuadrupedEnv(gym.Env):
         dir_path = os.path.dirname(os.path.realpath(__file__))
         self.base_path = Path(dir_path) / 'robot_model' / robot
         
-        self.scene_env = None
+
         self.reset_env_counter=0
         self.scene_name = scene
 
@@ -119,16 +119,16 @@ class QuadrupedEnv(gym.Env):
         if scene == 'random_boxes' or scene == 'random_pyramids':
             self.model_file_path = self.base_path / f'scene_flat.xml'
             if scene == 'random_boxes':
-                self.scene_env = add_world_of_boxes(self.model_file_path,
+                scene_env = add_world_of_boxes(self.model_file_path,
                                             init_pos=[0.6, -1.5, 0.02],
                                             euler=[0, 0, 0.0],
                                             nums=[10, 10],
                                             separation=[0.5, 0.5])
             else:
-                self.scene_env = add_world_of_pyramid(self.model_file_path, init_pos=[3, 0, 0.02])
+                scene_env = add_world_of_pyramid(self.model_file_path, init_pos=[3, 0, 0.02])
             
             self.model_file_path = self.base_path / f'scene_new.xml'
-            self.scene_env.write(self.model_file_path)
+            scene_env.write(self.model_file_path)
 
         else:
             self.model_file_path = self.base_path / f'scene_{scene}.xml'
@@ -337,25 +337,23 @@ class QuadrupedEnv(gym.Env):
         tangential_friction = np.random.uniform(*self.ground_friction_coeff_range)
         self._set_ground_friction(tangential_coeff=tangential_friction)
 
-        if(self.scene_name== "flat"):
-            self.reset_env_counter+=1
-            return self._get_obs()
+
 
         # reset World----------------------------------------------
-        if(os.path.exists(self.model_file_path) and self.scene_env is not None): 
-            #os.remove(self.model_file_path) 
+        if(os.path.exists(self.model_file_path) and 
+           self.scene_name == "random_boxes" or self.scene_name == "random_pyramids"): 
             self.model_file_path = self.base_path / f'scene_flat.xml'
             if(self.scene_name == "random_boxes"):
-                self.scene_env = add_world_of_boxes(self.model_file_path,
+                scene_env = add_world_of_boxes(self.model_file_path,
                                                     init_pos=[0.6, -1.5, 0.02],
                                                     euler=[0, 0, 0.0],
                                                     nums=[10, 10],
                                                     separation=[0.5, 0.5])
             elif(self.scene_name == "random_pyramids"):
-                self.scene_env = add_world_of_pyramid(self.model_file_path, init_pos=[3, 0, 0.02])
+                scene_env = add_world_of_pyramid(self.model_file_path, init_pos=[3, 0, 0.02])
 
             self.model_file_path = self.base_path / f'scene_new.xml'
-            self.scene_env.write(self.model_file_path)
+            scene_env.write(self.model_file_path)
 
             #Load the robot and scene to mujoco
             try:
@@ -363,6 +361,7 @@ class QuadrupedEnv(gym.Env):
             except ValueError as e:
                 raise ValueError(f"Error loading the scene {self.model_file_path}:") from e
         #--------------------------------------------------------------    
+
 
         self.reset_env_counter+=1
         return self._get_obs()
