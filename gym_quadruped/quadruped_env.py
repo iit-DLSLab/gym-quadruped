@@ -20,7 +20,7 @@ from gym_quadruped.utils.math_utils import homogenous_transform
 from gym_quadruped.utils.mujoco.visual import change_robot_appearance, render_ghost_robot, render_vector
 from gym_quadruped.utils.quadruped_utils import LegsAttr, extract_mj_joint_info
 
-from gym_quadruped.utils.mujoco.terrain import add_world_of_boxes
+from gym_quadruped.utils.mujoco.terrain import add_world_of_boxes, add_world_of_pyramid
 
 BASE_OBS = ['base_pos',
             'base_lin_vel', 'base_lin_vel:base',
@@ -112,13 +112,16 @@ class QuadrupedEnv(gym.Env):
         base_path = Path(dir_path) / 'robot_model' / robot
         
         # Random terrain generation
-        if scene == 'random_boxes':
+        if scene == 'random_boxes' or scene == 'random_pyramids':
             model_file_path = base_path / f'scene_flat.xml'
-            scene = add_world_of_boxes(model_file_path,
-                                        init_pos=[0.6, -1.5, 0.02],
-                                        euler=[0, 0, 0.0],
-                                        nums=[10, 10],
-                                        separation=[0.5, 0.5])
+            if scene == 'random_boxes':
+                scene = add_world_of_boxes(model_file_path,
+                                            init_pos=[0.6, -1.5, 0.02],
+                                            euler=[0, 0, 0.0],
+                                            nums=[10, 10],
+                                            separation=[0.5, 0.5])
+            else:
+                scene = add_world_of_pyramid(model_file_path, init_pos=[3, 0, 0.02])
             model_file_path = base_path / f'scene_new.xml'
             scene.write(model_file_path)
 

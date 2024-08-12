@@ -144,6 +144,12 @@ def euler_to_rot(roll, pitch, yaw):
     return rot_z @ rot_y @ rot_x
 
 
+# 2d rotate
+def rot2d(x, y, yaw):
+    nx = x * np.cos(yaw) - y * np.sin(yaw)
+    ny = x * np.sin(yaw) + y * np.cos(yaw)
+    return nx, ny
+
 # 3d rotate
 def rot3d(pos, euler):
     R = euler_to_rot(euler[0], euler[1], euler[2])
@@ -213,4 +219,30 @@ def add_world_of_boxes(model_file_path,
             local_pos[1] += new_separation[1]
             pos = rot3d(local_pos, euler) + np.array(init_pos)
             add_box(asset, worldbody, pos, new_box_euler, new_box_size)
+    return scene
+
+
+def add_world_of_pyramid(model_file_path,
+                    init_pos=[1.0, 0.0, 0.0],
+                    yaw=0.0,
+                    width=5,
+                    max_height=0.15,
+                    length=5,
+                    stair_nums=5):
+    scene = xml_et.parse(model_file_path)
+    root = scene.getroot()
+    worldbody = root.find("worldbody")
+    asset = root.find("asset")
+
+    local_pos = [0.0, 0.0, -0.05]
+    height_rand = np.random.uniform(0.08, max_height, 1)
+    stride_rand = np.random.uniform(0.5, 1.0, 1)
+    for i in range(stair_nums):
+        local_pos[2] += height_rand[0] 
+        x, y = rot2d(local_pos[0], local_pos[1], yaw)
+        new_width = width - stride_rand[0] * i
+        new_length = length - stride_rand[0] * i
+        add_box(asset, worldbody, [x + init_pos[0], y + init_pos[1], local_pos[2]],
+                    [0.0, 0.0, yaw], [new_width, new_length, height_rand[0]])
+        
     return scene
