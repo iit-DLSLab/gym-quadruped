@@ -28,9 +28,11 @@ obs = env.reset()
 heightmap = HeightMap(n=5,dist_x=0.1,dist_y=0.1,mjModel=env.mjModel,mjData=env.mjData)
 env.render()
 
+
+N_STEPS_PER_EPISODE = 1000
 while True: 
     #this fixes the base floating mid air at point 1,1,0.5
-    env.mjData.qpos[0]=1
+    env.mjData.qpos[0]=-1
     env.mjData.qpos[1]=1
     env.mjData.qpos[2]=0.5
 
@@ -50,8 +52,11 @@ while True:
                                             color=[0, 1, 0, .5],
                                             geom_id=heightmap.geom_ids[i, j])
 
-    if is_terminated:
-        pass
-        # Do some stuff
+    if env.step_num > N_STEPS_PER_EPISODE or is_terminated or is_truncated:
+        if is_terminated:
+            print("Environment terminated")
+        else:
+            print(f"reset {env.reset_env_counter}")
+            env.reset(random=False)
     env.render()
 env.close()
