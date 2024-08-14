@@ -339,7 +339,7 @@ class QuadrupedEnv(gym.Env):
 
 
 
-        # reset World----------------------------------------------
+        """# reset World----------------------------------------------
         if(os.path.exists(self.model_file_path) and 
            self.scene_name == "random_boxes" or self.scene_name == "random_pyramids"): 
             self.model_file_path = self.base_path / f'scene_flat.xml'
@@ -366,7 +366,7 @@ class QuadrupedEnv(gym.Env):
                 self.render()
             except ValueError as e:
                 raise ValueError(f"Error loading the scene {self.model_file_path}:") from e
-        #--------------------------------------------------------------    
+        #-------------------------------------------------------------- """   
 
 
         self.reset_env_counter+=1
