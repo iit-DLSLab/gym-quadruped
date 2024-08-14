@@ -358,6 +358,12 @@ class QuadrupedEnv(gym.Env):
             #Load the robot and scene to mujoco
             try:
                 self.mjModel: MjModel = mujoco.MjModel.from_xml_path(str(self.model_file_path))
+                self.mjData: MjData = mujoco.MjData(self.mjModel)
+                mujoco.mj_resetDataKeyframe(self.mjModel, self.mjData, 0)
+                # MjData structure to compute and store the state of a ghost/transparent robot for visual rendering.
+                self._ghost_mjData: MjData = mujoco.MjData(self.mjModel)
+                self.close()
+                self.render()
             except ValueError as e:
                 raise ValueError(f"Error loading the scene {self.model_file_path}:") from e
         #--------------------------------------------------------------    
