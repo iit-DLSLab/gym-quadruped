@@ -94,68 +94,6 @@ def add_perlin_heightfield(
     geo.attrib["quat"] = list_to_str(quat_wxyz)
 
 
-# zyx euler angle to quaternion
-def euler_to_quat(roll, pitch, yaw):
-    cx = np.cos(roll / 2)
-    sx = np.sin(roll / 2)
-    cy = np.cos(pitch / 2)
-    sy = np.sin(pitch / 2)
-    cz = np.cos(yaw / 2)
-    sz = np.sin(yaw / 2)
-
-    return np.array(
-        [
-            cx * cy * cz + sx * sy * sz,
-            sx * cy * cz - cx * sy * sz,
-            cx * sy * cz + sx * cy * sz,
-            cx * cy * sz - sx * sy * cz,
-        ],
-        dtype=np.float64,
-    )
-
-
-# zyx euler angle to rotation matrix
-def euler_to_rot(roll, pitch, yaw):
-    rot_x = np.array(
-        [
-            [1, 0, 0],
-            [0, np.cos(roll), -np.sin(roll)],
-            [0, np.sin(roll), np.cos(roll)],
-        ],
-        dtype=np.float64,
-    )
-
-    rot_y = np.array(
-        [
-            [np.cos(pitch), 0, np.sin(pitch)],
-            [0, 1, 0],
-            [-np.sin(pitch), 0, np.cos(pitch)],
-        ],
-        dtype=np.float64,
-    )
-    rot_z = np.array(
-        [
-            [np.cos(yaw), -np.sin(yaw), 0],
-            [np.sin(yaw), np.cos(yaw), 0],
-            [0, 0, 1],
-        ],
-        dtype=np.float64,
-    )
-    return rot_z @ rot_y @ rot_x
-
-
-# 2d rotate
-def rot2d(x, y, yaw):
-    nx = x * np.cos(yaw) - y * np.sin(yaw)
-    ny = x * np.sin(yaw) + y * np.cos(yaw)
-    return nx, ny
-
-# 3d rotate
-def rot3d(pos, euler):
-    R = euler_to_rot(euler[0], euler[1], euler[2])
-    return R @ pos
-
-
 # Add Box to scene
 def add_box(asset: xml_et.Element,
             worldbody: xml_et.Element,
@@ -167,7 +105,7 @@ def add_box(asset: xml_et.Element,
     geo.attrib["type"] = "box"
     geo.attrib["size"] = list_to_str(
         0.5 * np.array(size))  # half size of box for mujoco
-    quat = euler_to_quat(euler[0], euler[1], euler[2])
+    quat = Rotation.from_euler("xyz", euler).as_quat(canonical=True, scalar_first=True)
     geo.attrib["quat"] = list_to_str(quat)
 
 
@@ -217,7 +155,7 @@ def add_world_of_boxes(model_file_path,
             new_separation = np.array([new_separation_x[0], new_separation_y[0]])
 
             local_pos[1] += new_separation[1]
-            pos = rot3d(local_pos, euler) + np.array(init_pos)
+            pos = Rotation.from_euler("xyz", euler).as_matrix() @ local_pos + np.array(init_pos)
             add_box(asset, worldbody, pos, new_box_euler, new_box_size)
     return scene
 
@@ -239,7 +177,7 @@ def add_world_of_pyramid(model_file_path,
     stride_rand = np.random.uniform(0.5, 1.0, 1)
     for i in range(stair_nums):
         local_pos[2] += height_rand[0] 
-        x, y = rot2d(local_pos[0], local_pos[1], yaw)
+        x, y, _ = Rotation.from_euler('xyz', [0, 0, yaw]).as_matrix() @ local_pos
         new_width = width - stride_rand[0] * i
         new_length = length - stride_rand[0] * i
         add_box(asset, worldbody, [x + init_pos[0], y + init_pos[1], local_pos[2]],

@@ -109,35 +109,40 @@ class QuadrupedEnv(gym.Env):
         # TODO: We should create a scene with the desired terrain and load the robot model (or multiple instances of the
         #   robot models relying on robot_descriptions.py. This way of loading the XML is not ideal.
         dir_path = os.path.dirname(os.path.realpath(__file__))
-        base_path = Path(dir_path) / 'robot_model' / robot
+        self.base_path = Path(dir_path) / 'robot_model' / robot
         
+
+        self.reset_env_counter=0
+        self.scene_name = scene
+
         # Random terrain generation
         if scene == 'random_boxes' or scene == 'random_pyramids':
-            model_file_path = base_path / f'scene_flat.xml'
+            self.model_file_path = self.base_path / f'scene_flat.xml'
             if scene == 'random_boxes':
-                scene = add_world_of_boxes(model_file_path,
+                scene_env = add_world_of_boxes(self.model_file_path,
                                             init_pos=[0.6, -1.5, 0.02],
                                             euler=[0, 0, 0.0],
                                             nums=[10, 10],
                                             separation=[0.5, 0.5])
             else:
-                scene = add_world_of_pyramid(model_file_path, init_pos=[3, 0, 0.02])
-            model_file_path = base_path / f'scene_new.xml'
-            scene.write(model_file_path)
+                scene_env = add_world_of_pyramid(self.model_file_path, init_pos=[3, 0, 0.02])
+            
+            self.model_file_path = self.base_path / f'scene_new.xml'
+            scene_env.write(self.model_file_path)
 
         else:
-            model_file_path = base_path / f'scene_{scene}.xml'
-            print(model_file_path)
-            assert model_file_path.exists(), f"Model file not found: {model_file_path.absolute().resolve()}"
+            self.model_file_path = self.base_path / f'scene_{scene}.xml'
+            print(self.model_file_path)
+            assert self.model_file_path.exists(), f"Model file not found: {self.model_file_path.absolute().resolve()}"
 
 
 
 
         # Load the robot and scene to mujoco
         try:
-            self.mjModel: MjModel = mujoco.MjModel.from_xml_path(str(model_file_path))
+            self.mjModel: MjModel = mujoco.MjModel.from_xml_path(str(self.model_file_path))
         except ValueError as e:
-            raise ValueError(f"Error loading the scene {model_file_path}:") from e
+            raise ValueError(f"Error loading the scene {self.model_file_path}:") from e
 
         self.mjData: MjData = mujoco.MjData(self.mjModel)
         # MjData structure to compute and store the state of a ghost/transparent robot for visual rendering.
@@ -332,6 +337,39 @@ class QuadrupedEnv(gym.Env):
         tangential_friction = np.random.uniform(*self.ground_friction_coeff_range)
         self._set_ground_friction(tangential_coeff=tangential_friction)
 
+
+
+        """# reset World----------------------------------------------
+        if(os.path.exists(self.model_file_path) and 
+           self.scene_name == "random_boxes" or self.scene_name == "random_pyramids"): 
+            self.model_file_path = self.base_path / f'scene_flat.xml'
+            if(self.scene_name == "random_boxes"):
+                scene_env = add_world_of_boxes(self.model_file_path,
+                                                    init_pos=[0.6, -1.5, 0.02],
+                                                    euler=[0, 0, 0.0],
+                                                    nums=[10, 10],
+                                                    separation=[0.5, 0.5])
+            elif(self.scene_name == "random_pyramids"):
+                scene_env = add_world_of_pyramid(self.model_file_path, init_pos=[3, 0, 0.02])
+
+            self.model_file_path = self.base_path / f'scene_new.xml'
+            scene_env.write(self.model_file_path)
+
+            #Load the robot and scene to mujoco
+            try:
+                self.mjModel: MjModel = mujoco.MjModel.from_xml_path(str(self.model_file_path))
+                self.mjData: MjData = mujoco.MjData(self.mjModel)
+                mujoco.mj_resetDataKeyframe(self.mjModel, self.mjData, 0)
+                # MjData structure to compute and store the state of a ghost/transparent robot for visual rendering.
+                self._ghost_mjData: MjData = mujoco.MjData(self.mjModel)
+                self.close()
+                self.render()
+            except ValueError as e:
+                raise ValueError(f"Error loading the scene {self.model_file_path}:") from e
+        #-------------------------------------------------------------- """   
+
+
+        self.reset_env_counter+=1
         return self._get_obs()
 
     def render(self, mode='human', tint_robot=False, ghost_qpos=None, ghost_alpha=0.5):
