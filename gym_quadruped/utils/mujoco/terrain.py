@@ -126,6 +126,12 @@ def add_world_of_boxes(model_file_path,
     worldbody = root.find("worldbody")
     asset = root.find("asset")
 
+    # variables to calculate the area of boxes
+    max_abs_x = 0
+    sign_x = 0  
+    max_abs_y = 0
+    sign_y = 0
+
     #local_pos = [0.0, 0.0, -0.5 * box_size[2]]
     local_pos = [0.0, 0.0, 0.0]
     new_separation = np.array(separation) + np.array(
@@ -155,9 +161,29 @@ def add_world_of_boxes(model_file_path,
             new_separation = np.array([new_separation_x[0], new_separation_y[0]])
 
             local_pos[1] += new_separation[1]
+            
             pos = Rotation.from_euler("xyz", euler).as_matrix() @ local_pos + np.array(init_pos)
+            tmp_X = abs(local_pos[0] + init_pos[0])
+            tmp_Y = abs(local_pos[1] + init_pos[1])
+            if(tmp_X>=max_abs_x): 
+                max_abs_x = tmp_X
+                sign_x = 1 if tmp_X > 0 else -1
+            if(tmp_Y>=max_abs_y): 
+                max_abs_y = tmp_Y
+                sign_y = 1 if tmp_Y > 0 else -1
             add_box(asset, worldbody, pos, new_box_euler, new_box_size)
-    return scene
+    
+    #apply sign to the absoulte max values
+    max_x = max_abs_x * sign_x
+    max_y = max_abs_y * sign_y
+
+    # center of the area
+    center = ((max_y - init_pos[1])/2, (max_x - init_pos[0])/2)
+
+    # create a radius to spawn the robot at a safe distance
+    if(max_abs_x >=max_abs_y): radius = 1.4*(max_x - init_pos[0])/np.sqrt(2)
+    else:                      radius = 1.4*(max_y - init_pos[1])/np.sqrt(2)
+    return scene, radius, center
 
 
 def add_world_of_pyramid(model_file_path,
@@ -172,6 +198,12 @@ def add_world_of_pyramid(model_file_path,
     worldbody = root.find("worldbody")
     asset = root.find("asset")
 
+    # variables to calculate the area of boxes
+    max_abs_x = 0
+    sign_x = 0  
+    max_abs_y = 0
+    sign_y = 0
+
     local_pos = [0.0, 0.0, -0.05]
     height_rand = np.random.uniform(0.08, max_height, 1)
     stride_rand = np.random.uniform(0.5, 1.0, 1)
@@ -180,7 +212,25 @@ def add_world_of_pyramid(model_file_path,
         x, y, _ = Rotation.from_euler('xyz', [0, 0, yaw]).as_matrix() @ local_pos
         new_width = width - stride_rand[0] * i
         new_length = length - stride_rand[0] * i
+        tmp_X = abs(x + init_pos[0])
+        tmp_Y = abs(y + init_pos[1])
+        if(tmp_X>=max_abs_x): 
+            max_abs_x = tmp_X
+            sign_x = 1 if tmp_X > 0 else -1
+        if(tmp_Y>=max_abs_y): 
+            max_abs_y = tmp_Y
+            sign_y = 1 if tmp_Y > 0 else -1
         add_box(asset, worldbody, [x + init_pos[0], y + init_pos[1], local_pos[2]],
                     [0.0, 0.0, yaw], [new_width, new_length, height_rand[0]])
         
-    return scene
+    max_x = max_abs_x * sign_x
+    max_y = max_abs_y * sign_y
+
+    # center of the area
+    center = (max_y - init_pos[1]/2, max_x - init_pos[0]/2)
+
+    # create a radius to spawn the robot at a safe distance
+    if(max_abs_x >=max_abs_y): radius = 1.4*(max_x - init_pos[0])/np.sqrt(2)
+    else:                      radius = 1.4*(max_y - init_pos[1])/np.sqrt(2)
+    
+    return scene, radius, center
