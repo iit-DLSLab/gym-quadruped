@@ -12,11 +12,12 @@ import gymnasium as gym
 import mujoco
 import mujoco.viewer
 import numpy as np
+import math
 from gymnasium import spaces
 from mujoco import MjData, MjModel
 from scipy.spatial.transform import Rotation
 
-from gym_quadruped.utils.math_utils import homogenous_transform, vector_to_quaternion
+from gym_quadruped.utils.math_utils import homogenous_transform, angle_between_vectors
 from gym_quadruped.utils.mujoco.visual import change_robot_appearance, render_ghost_robot, render_vector
 from gym_quadruped.utils.quadruped_utils import LegsAttr, extract_mj_joint_info
 
@@ -265,30 +266,50 @@ class QuadrupedEnv(gym.Env):
         # Reset the robot state ----------------------------------------------------------------------------------------
         if qpos is None and qvel is None:  # Random initialization around xml keyframe 0
             mujoco.mj_resetDataKeyframe(self.mjModel, self.mjData, 0)
-            mujoco.mj_resetData(self.mjModel, self.mjData)
+            
             # Add white noise to the joint-space position and velocity
             if random:
-                # q_pos_amp = 25 * np.pi / 180 if 'angle_sweep' not in options else options['angle_sweep']
-                # q_vel_amp = 0.1
-                # self.mjData.qpos[7:] += np.random.uniform(-q_pos_amp, q_pos_amp, self.mjModel.nq - 7)
-                # self.mjData.qvel[6:] += np.random.uniform(-q_vel_amp, q_vel_amp, self.mjModel.nv - 6)
-                # # Random orientation
-                # roll_sweep = 10 * np.pi / 180 if 'roll_sweep' not in options else options['roll_sweep']
-                # pitch_sweep = 10 * np.pi / 180 if 'pitch_sweep' not in options else options['pitch_sweep']
-                # ori_xyzw = Rotation.from_euler('xyz',
-                #                                [np.random.uniform(-roll_sweep, roll_sweep),
-                #                                 np.random.uniform(-pitch_sweep, pitch_sweep),
-                #                                 np.random.uniform(-np.pi, np.pi)]).as_quat(canonical=True)
-                # ori_wxyz = np.roll(ori_xyzw, 1)
-                # self.mjData.qpos[3:7] = ori_wxyz
-                # # Random xy position withing a 2 x 2 square
-                # self.mjData.qpos[0:2] = np.random.uniform(-2, 2, 2)
-                (newX, newY), orien = self.random_facing_center(self.terrain_center,self.terrain_radius)
-                ori_xyzw = vector_to_quaternion(orien)
+                q_pos_amp = 25 * np.pi / 180 if 'angle_sweep' not in options else options['angle_sweep']
+                q_vel_amp = 0.1
+                self.mjData.qpos[7:] += np.random.uniform(-q_pos_amp, q_pos_amp, self.mjModel.nq - 7)
+                self.mjData.qvel[6:] += np.random.uniform(-q_vel_amp, q_vel_amp, self.mjModel.nv - 6)
+                
+                
+                if(self.scene_name=="random_boxes" or self.scene_name=="random_pyramids"):
+                    # Random xy position within a circle of the random generated terrain
+                    # Orientation pointing toward the center of the terrain
+                    cx,cy = self.terrain_center
+
+                    # Generate a random angle (in radians)
+                    angle = np.random.uniform(0, 2 * np.pi)
+
+                    # Calculate the x and y coordinates on the border of the circle
+                    x_border = cx + self.terrain_radius * np.cos(angle)
+                    y_border = cy + self.terrain_radius * np.sin(angle)
+
+                    # Create the vector pointing to the center (cx, cy) from (x_border, y_border)
+                    vector_world_to_border = np.array([x_border, y_border, 0])
+                    vector_world_to_center = np.array([cx, cy, 0])
+                    
+                    theta = angle_between_vectors(vector_world_to_border, vector_world_to_center)
+                    
+                    ori_xyzw = Rotation.from_euler('xyz', [0, 0, theta]).as_quat(canonical=True)
+                    
+                    self.mjData.qpos[0:2] = np.array([x_border, y_border], dtype=np.float32)   
+                else:
+                    # Random orientation
+                    roll_sweep = 10 * np.pi / 180 if 'roll_sweep' not in options else options['roll_sweep']
+                    pitch_sweep = 10 * np.pi / 180 if 'pitch_sweep' not in options else options['pitch_sweep']
+                    ori_xyzw = Rotation.from_euler('xyz',
+                                                [np.random.uniform(-roll_sweep, roll_sweep),
+                                                    np.random.uniform(-pitch_sweep, pitch_sweep),
+                                                    np.random.uniform(-np.pi, np.pi)]).as_quat(canonical=True)
+                    # Random xy position withing a 2 x 2 square
+                    self.mjData.qpos[0:2] = np.random.uniform(-2, 2, 2)                 
+                    
 
                 ori_wxyz = np.roll(ori_xyzw, 1)
                 self.mjData.qpos[3:7] = ori_wxyz
-                self.mjData.qpos[0:2] = np.array([newX, newY], dtype=np.float32)
 
 
                 try:
@@ -384,30 +405,7 @@ class QuadrupedEnv(gym.Env):
         self.reset_env_counter+=1
         return self._get_obs()
     
-    def random_facing_center(self, center, radius):
-        """
-            Create coordinates for the robot to spawn based on the radius and center of an area.
-            The robot will spawn facing the center of the World
-            Args:
-                center (tuple): center coordinates of the obstacle World
-                radius (float): radius value for the robot to be spawn
-            Returns:
-                Border coordinates 
-                Orientation vector
-        """
-        cx,cy = center
 
-        # Generate a random angle (in radians)
-        angle = np.random.uniform(0, 2 * np.pi)
-
-        # Calculate the x and y coordinates on the border of the circle
-        x_border = cx + radius * np.cos(angle)
-        y_border = cy + radius * np.sin(angle)
-
-        # Create the vector pointing to the center (cx, cy) from (x_border, y_border)
-        vector_to_center = (cx - x_border, cy - y_border, 1)
-
-        return (x_border, y_border), vector_to_center
 
     def render(self, mode='human', tint_robot=False, ghost_qpos=None, ghost_alpha=0.5):
         """ Render the environment.
