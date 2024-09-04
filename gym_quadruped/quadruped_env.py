@@ -226,7 +226,8 @@ class QuadrupedEnv(gym.Env):
 
         # Check if done (simplified, usually more complex)
         invalid_contact, contact_info = self._check_for_invalid_contacts()
-        is_terminated = invalid_contact  # and ...
+        out_of_terrain_bounds = self._check_for_robot_out_of_terrain_bounds()
+        is_terminated = invalid_contact or out_of_terrain_bounds # and ...
         is_truncated = False
         # Info dictionary
         info = dict(time=self.mjData.time, step_num=self.step_num, invalid_contacts=contact_info)
@@ -950,6 +951,16 @@ class QuadrupedEnv(gym.Env):
                 pass  # Do nothing for now
 
         return invalid_contact_detected, invalid_contacts  # No invalid contact detected
+    
+    def _check_for_robot_out_of_terrain_bounds(self) -> bool:
+        """Env termination occurs when the robot is outside the environment."""
+        if(self.scene_name=="random_boxes" or self.scene_name=="random_pyramids"):
+            distance_robot_to_center = np.linalg.norm(self.base_pos[:2] - self.terrain_center)
+            if distance_robot_to_center > self.terrain_radius*1.3:
+                return True
+        else:
+            return False
+
 
     def _get_geom_body_info(self, geom_name: str = None, geom_id: int = None) -> [int, str]:
         """Returns the body ID and name associated with the geometry name or ID."""
