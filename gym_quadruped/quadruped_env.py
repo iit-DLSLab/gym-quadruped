@@ -12,13 +12,16 @@ import gymnasium as gym
 import mujoco
 import mujoco.viewer
 import numpy as np
+import math
 from gymnasium import spaces
 from mujoco import MjData, MjModel
 from scipy.spatial.transform import Rotation
 
-from gym_quadruped.utils.math_utils import homogenous_transform
+from gym_quadruped.utils.math_utils import homogenous_transform, angle_between_vectors
 from gym_quadruped.utils.mujoco.visual import change_robot_appearance, render_ghost_robot, render_vector
 from gym_quadruped.utils.quadruped_utils import LegsAttr, extract_mj_joint_info
+
+from gym_quadruped.utils.mujoco.terrain import add_world_of_boxes, add_world_of_pyramid
 
 BASE_OBS = ['base_pos',
             'base_lin_vel', 'base_lin_vel:base',
@@ -107,16 +110,42 @@ class QuadrupedEnv(gym.Env):
         # TODO: We should create a scene with the desired terrain and load the robot model (or multiple instances of the
         #   robot models relying on robot_descriptions.py. This way of loading the XML is not ideal.
         dir_path = os.path.dirname(os.path.realpath(__file__))
-        base_path = Path(dir_path) / 'robot_model' / robot
-        model_file_path = base_path / f'scene_{scene}.xml'
-        print(model_file_path)
-        assert model_file_path.exists(), f"Model file not found: {model_file_path.absolute().resolve()}"
+        self.base_path = Path(dir_path) / 'robot_model' / robot
+        
+
+        self.reset_env_counter=0
+        self.scene_name = scene
+        self.terrain_radius = None
+        self.terrain_center = None
+
+        # Random terrain generation
+        if scene == 'random_boxes' or scene == 'random_pyramids':
+            self.model_file_path = self.base_path / f'scene_flat.xml'
+            if scene == 'random_boxes':
+                scene_env, self.terrain_radius, self.terrain_center = add_world_of_boxes(self.model_file_path,
+                                                                                        init_pos=[0.6, -1.5, 0.02],
+                                                                                        euler=[0, 0, 0.0],
+                                                                                        nums=[10, 10],
+                                                                                        separation=[0.5, 0.5])
+            else:
+                scene_env, self.terrain_radius, self.terrain_center = add_world_of_pyramid(self.model_file_path, init_pos=[3, 0, 0.02])
+            
+            self.model_file_path = self.base_path / f'scene_new.xml'
+            scene_env.write(self.model_file_path)
+
+        else:
+            self.model_file_path = self.base_path / f'scene_{scene}.xml'
+            print(self.model_file_path)
+            assert self.model_file_path.exists(), f"Model file not found: {self.model_file_path.absolute().resolve()}"
+
+
+
 
         # Load the robot and scene to mujoco
         try:
-            self.mjModel: MjModel = mujoco.MjModel.from_xml_path(str(model_file_path))
+            self.mjModel: MjModel = mujoco.MjModel.from_xml_path(str(self.model_file_path))
         except ValueError as e:
-            raise ValueError(f"Error loading the scene {model_file_path}:") from e
+            raise ValueError(f"Error loading the scene {self.model_file_path}:") from e
 
         self.mjData: MjData = mujoco.MjData(self.mjModel)
         # MjData structure to compute and store the state of a ghost/transparent robot for visual rendering.
@@ -197,7 +226,8 @@ class QuadrupedEnv(gym.Env):
 
         # Check if done (simplified, usually more complex)
         invalid_contact, contact_info = self._check_for_invalid_contacts()
-        is_terminated = invalid_contact  # and ...
+        out_of_terrain_bounds = self._check_for_robot_out_of_terrain_bounds()
+        is_terminated = invalid_contact or out_of_terrain_bounds # and ...
         is_truncated = False
         # Info dictionary
         info = dict(time=self.mjData.time, step_num=self.step_num, invalid_contacts=contact_info)
@@ -237,23 +267,51 @@ class QuadrupedEnv(gym.Env):
         # Reset the robot state ----------------------------------------------------------------------------------------
         if qpos is None and qvel is None:  # Random initialization around xml keyframe 0
             mujoco.mj_resetDataKeyframe(self.mjModel, self.mjData, 0)
+            
             # Add white noise to the joint-space position and velocity
             if random:
                 q_pos_amp = 25 * np.pi / 180 if 'angle_sweep' not in options else options['angle_sweep']
                 q_vel_amp = 0.1
                 self.mjData.qpos[7:] += np.random.uniform(-q_pos_amp, q_pos_amp, self.mjModel.nq - 7)
                 self.mjData.qvel[6:] += np.random.uniform(-q_vel_amp, q_vel_amp, self.mjModel.nv - 6)
-                # Random orientation
-                roll_sweep = 10 * np.pi / 180 if 'roll_sweep' not in options else options['roll_sweep']
-                pitch_sweep = 10 * np.pi / 180 if 'pitch_sweep' not in options else options['pitch_sweep']
-                ori_xyzw = Rotation.from_euler('xyz',
-                                               [np.random.uniform(-roll_sweep, roll_sweep),
-                                                np.random.uniform(-pitch_sweep, pitch_sweep),
-                                                np.random.uniform(-np.pi, np.pi)]).as_quat(canonical=True)
+                
+                
+                if(self.scene_name=="random_boxes" or self.scene_name=="random_pyramids"):
+                    # Random xy position within a circle of the random generated terrain
+                    # Orientation pointing toward the center of the terrain
+                    cx,cy = self.terrain_center
+
+                    # Generate a random angle (in radians)
+                    angle = np.random.uniform(0, 2 * np.pi)
+
+                    # Calculate the x and y coordinates on the border of the circle
+                    x_border = cx + self.terrain_radius * np.cos(angle)
+                    y_border = cy + self.terrain_radius * np.sin(angle)
+
+                    # Create the vector pointing to the center (cx, cy) from (x_border, y_border)
+                    vector_world_to_border = np.array([x_border, y_border, 0])
+                    vector_world_to_center = np.array([cx, cy, 0])
+                    
+                    theta = angle_between_vectors(vector_world_to_border, vector_world_to_center)
+                    
+                    ori_xyzw = Rotation.from_euler('xyz', [0, 0, theta]).as_quat(canonical=True)
+                    
+                    self.mjData.qpos[0:2] = np.array([x_border, y_border], dtype=np.float32)   
+                else:
+                    # Random orientation
+                    roll_sweep = 10 * np.pi / 180 if 'roll_sweep' not in options else options['roll_sweep']
+                    pitch_sweep = 10 * np.pi / 180 if 'pitch_sweep' not in options else options['pitch_sweep']
+                    ori_xyzw = Rotation.from_euler('xyz',
+                                                [np.random.uniform(-roll_sweep, roll_sweep),
+                                                    np.random.uniform(-pitch_sweep, pitch_sweep),
+                                                    np.random.uniform(-np.pi, np.pi)]).as_quat(canonical=True)
+                    # Random xy position withing a 2 x 2 square
+                    self.mjData.qpos[0:2] = np.random.uniform(-2, 2, 2)                 
+                    
+
                 ori_wxyz = np.roll(ori_xyzw, 1)
                 self.mjData.qpos[3:7] = ori_wxyz
-                # Random xy position withing a 2 x 2 square
-                self.mjData.qpos[0:2] = np.random.uniform(-2, 2, 2)
+
 
                 try:
                     feet_pos = self.feet_pos(frame='world')
@@ -311,7 +369,44 @@ class QuadrupedEnv(gym.Env):
         tangential_friction = np.random.uniform(*self.ground_friction_coeff_range)
         self._set_ground_friction(tangential_coeff=tangential_friction)
 
+
+
+        """# reset World----------------------------------------------
+        if(os.path.exists(self.model_file_path) and 
+           self.scene_name == "random_boxes" or self.scene_name == "random_pyramids"): 
+            self.model_file_path = self.base_path / f'scene_flat.xml'
+            if(self.scene_name == "random_boxes"):
+                scene_env = add_world_of_boxes(self.model_file_path,
+                                                    init_pos=[0.6, -1.5, 0.02],
+                                                    euler=[0, 0, 0.0],
+                                                    nums=[10, 10],
+                                                    separation=[0.5, 0.5])
+            elif(self.scene_name == "random_pyramids"):
+                scene_env = add_world_of_pyramid(self.model_file_path, init_pos=[3, 0, 0.02])
+
+            self.model_file_path = self.base_path / f'scene_new.xml'
+            scene_env.write(self.model_file_path)
+
+            #Load the robot and scene to mujoco
+            try:
+                self.mjModel: MjModel = mujoco.MjModel.from_xml_path(str(self.model_file_path))
+                self.mjData: MjData = mujoco.MjData(self.mjModel)
+                mujoco.mj_resetDataKeyframe(self.mjModel, self.mjData, 0)
+                # MjData structure to compute and store the state of a ghost/transparent robot for visual rendering.
+                self._ghost_mjData: MjData = mujoco.MjData(self.mjModel)
+                self.close()
+                self.render()
+            except ValueError as e:
+                raise ValueError(f"Error loading the scene {self.model_file_path}:") from e
+        #-------------------------------------------------------------- """   
+
+            
+            
+
+        self.reset_env_counter+=1
         return self._get_obs()
+    
+
 
     def render(self, mode='human', tint_robot=False, ghost_qpos=None, ghost_alpha=0.5):
         """ Render the environment.
@@ -856,6 +951,16 @@ class QuadrupedEnv(gym.Env):
                 pass  # Do nothing for now
 
         return invalid_contact_detected, invalid_contacts  # No invalid contact detected
+    
+    def _check_for_robot_out_of_terrain_bounds(self) -> bool:
+        """Env termination occurs when the robot is outside the environment."""
+        if(self.scene_name=="random_boxes" or self.scene_name=="random_pyramids"):
+            distance_robot_to_center = np.linalg.norm(self.base_pos[:2] - self.terrain_center)
+            if distance_robot_to_center > self.terrain_radius*1.3:
+                return True
+        else:
+            return False
+
 
     def _get_geom_body_info(self, geom_name: str = None, geom_id: int = None) -> [int, str]:
         """Returns the body ID and name associated with the geometry name or ID."""
