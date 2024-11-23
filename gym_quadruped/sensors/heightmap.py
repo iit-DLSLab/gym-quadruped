@@ -15,7 +15,6 @@ np.set_printoptions(precision=3, suppress = True)
 
 
 class HeightMap:
-    #constructor
     def __init__(self,n,dist_x,dist_y,mjModel,mjData):
         '''
         init function of the grid_map class
@@ -79,21 +78,21 @@ class HeightMap:
         Example:  RR_Calf : <geom size="0.0265" pos="0 0 -0.25" rgba="0 0 0 0" />
         '''
 
-
-        self.geomgroup_test=np.array([1,0,1,1,1,1], dtype=np.uint8)
-        #
+        # In the XML, we usually set 1-2-3 for body related geom that we don't want to intersect
+        self.geomgroup_test=np.array([1, 0, 0, 0, 1, 1], dtype=np.uint8)
+        
         ray_sensor_site = np.array([pos[0],  pos[1], pos[2]-dist], dtype=np.float64)  # Starting point of the ray
         direction_vector = np.array([0, 0, -1], dtype=np.float64)
-        #geomgroup = None  # Interact with all geometry groups  geomgroup: Optional[numpy.ndarray[numpy.uint8[6, 1]]]
+        
         geomgroup = self.geomgroup_test
-        # geomgroup=np.ndarray[np.uint8[6,1]]
-        #geomgroup: Optional[numpy.ndarray[numpy.uint8[6, 1]]]
-        flg_static = 1  #  A flag indicating whether the ray should only intersect with static objects (1) or also with dynamic objects (0)
-        bodyexclude = -1  # #An optional parameter specifying a body ID to exclude from intersections. Use -1 to not exclude any body.
+        flg_static = 1  # A flag indicating whether the ray should only intersect with static objects (1) or also with dynamic objects (0)
+        bodyexclude = -1  # An optional parameter specifying a body ID to exclude from intersections. Use -1 to not exclude any body.
         geomid = np.zeros(1, dtype=np.int32) 
 
-        self.z =mujoco.mj_ray(m=self.mjModel, d=self.mjData, pnt=ray_sensor_site, vec=direction_vector,geomgroup=geomgroup, 
-                                    flg_static=flg_static,bodyexclude=bodyexclude, geomid=geomid)
+        self.z = mujoco.mj_ray(m=self.mjModel, d=self.mjData, 
+                               pnt=ray_sensor_site, vec=direction_vector,
+                               geomgroup=geomgroup, flg_static=flg_static,
+                               bodyexclude=bodyexclude, geomid=geomid)
         if self.use_map_initialization==True:
             if geomid[0] > 0:
                 intersection_point = ray_sensor_site + direction_vector * self.z
