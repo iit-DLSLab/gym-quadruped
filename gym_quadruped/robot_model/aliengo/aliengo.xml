@@ -52,6 +52,11 @@
             <!-- trunk visual mesh and collision -->
             <geom type="mesh" class="visual" rgba="0.2 0.2 0.2 1" mesh="trunk"/>
             <geom type="box" class="collision" size="0.18 0.075 0.056"/>
+
+            <!-- modify this to add payload -->
+            <!--body name="payload" pos="0 0 0">
+                <geom type="box" mass="0.01" pos="0 0 0.1" size="0.05 0.05 0.05" rgba="1 0 0 0.3"/>
+            </body-->
            
             <!-- imu and camera -->
             <site name="imu" pos="0 0 0"/>
