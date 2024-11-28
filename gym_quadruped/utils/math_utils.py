@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import numpy as np
 from scipy.spatial.transform import Rotation
 
@@ -32,3 +34,21 @@ def hom2pos_quatwxyz(X: np.ndarray):
     assert X.shape == (4, 4), f"Expected homogeneous transformation matrix, got {X}"
     pos = X[:3, 3]
     quat_xyzw = Rotation.from_matrix(X[:3, :3]).as_quat()
+
+
+
+def angle_between_vectors(vector1: np.ndarray, vector2: np.ndarray) -> float:
+    """
+        Calculate the angle between two vectors
+        Args:
+            vector1 (tuple): vector 1
+            vector2 (tuple): vector 2
+        Returns:
+            Angle in radians
+    """
+    """dot_product = np.dot(vector1, vector2)
+    magnitude_vector1 = np.linalg.norm(vector1)
+    magnitude_vector2 = np.linalg.norm(vector2)
+    return np.arccos(dot_product / (magnitude_vector1 * magnitude_vector2))"""
+    vector_diff = vector2 - vector1
+    return np.arctan2(vector_diff[1], vector_diff[0])

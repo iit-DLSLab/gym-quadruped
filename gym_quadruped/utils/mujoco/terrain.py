@@ -94,3 +94,148 @@ def add_perlin_heightfield(
     geo.attrib["quat"] = list_to_str(quat_wxyz)
 
 
+# Add Box to scene
+def add_box(asset: xml_et.Element,
+            worldbody: xml_et.Element,
+            position=[1.0, 0.0, 0.0],
+            euler=[0.0, 0.0, 0.0], 
+            size=[0.1, 0.1, 0.1]):
+    geo = xml_et.SubElement(worldbody, "geom")
+    geo.attrib["pos"] = list_to_str(position)
+    geo.attrib["type"] = "box"
+    geo.attrib["size"] = list_to_str(
+        0.5 * np.array(size))  # half size of box for mujoco
+    quat = Rotation.from_euler("xyz", euler).as_quat(canonical=True, scalar_first=True)
+    geo.attrib["quat"] = list_to_str(quat)
+
+
+def add_world_of_boxes(model_file_path,
+                       init_pos=[1.0, 0.0, 0.0],
+                       euler=[0.0, -0.0, 0.0],
+                       nums=[10, 10],
+                       box_size=[0.5, 0.5, 0.1],
+                       box_euler=[0.0, 0.0, 0.0],
+                       separation=[0.2, 0.2],
+                       box_size_rand=[1, 1, 1],
+                       box_euler_rand=[0.2, 0.2, 0.2],
+                       separation_rand=[0, 1],
+                       random_roll_pitch=False):
+
+    scene = xml_et.parse(model_file_path)
+    root = scene.getroot()
+    worldbody = root.find("worldbody")
+    asset = root.find("asset")
+
+    # variables to calculate the area of boxes
+    max_abs_x = 0
+    sign_x = 0  
+    max_abs_y = 0
+    sign_y = 0
+
+    #local_pos = [0.0, 0.0, -0.5 * box_size[2]]
+    local_pos = [0.0, 0.0, 0.0]
+    new_separation = np.array(separation) + np.array(
+        separation_rand) * np.random.uniform(-1.0, 1.0, 2)
+    for i in range(nums[0]):
+        local_pos[0] += new_separation[0]
+        local_pos[1] = 0.0
+        for j in range(nums[1]):
+            new_box_size_xy = np.array(box_size)[0:2] + np.array(
+                box_size_rand)[0:2] * np.random.uniform(-0.2, 0.2, 2)
+            new_box_size_z = np.array(box_size)[2] + np.array(
+                box_size_rand)[2] * np.random.uniform(-0.1, 0.15, 1)
+            new_box_size = np.array([new_box_size_xy[0], new_box_size_xy[1], new_box_size_z[0]])
+            
+            if random_roll_pitch:
+                new_box_euler = np.array(box_euler) + np.array(
+                    box_euler_rand) * np.random.uniform(-1.0, 1.0, 3)
+            else:
+                new_box_euler = np.array(box_euler) 
+                new_box_euler[2] = new_box_euler[2] + np.array(
+                    box_euler_rand)[2] * np.random.uniform(-1, 1, 1)                
+            
+            new_separation_x = np.array(separation)[0] + np.array(
+                separation_rand)[0] * np.random.uniform(0, 0.5, 1)
+            new_separation_y = np.array(separation)[1] + np.array(
+                separation_rand)[1] * np.random.uniform(-0.5, 0.5, 1)
+            new_separation = np.array([new_separation_x[0], new_separation_y[0]])
+
+            local_pos[1] += new_separation[1]
+            
+            pos = Rotation.from_euler("xyz", euler).as_matrix() @ local_pos + np.array(init_pos)
+            add_box(asset, worldbody, pos, new_box_euler, new_box_size)
+
+            # calculate the area of boxes to take the maximum values and the center
+            tmp_X = abs(local_pos[0] + init_pos[0])
+            tmp_Y = abs(local_pos[1] + init_pos[1])
+            if(tmp_X>=max_abs_x): 
+                max_abs_x = tmp_X
+                sign_x = 1 if tmp_X > 0 else -1
+            if(tmp_Y>=max_abs_y): 
+                max_abs_y = tmp_Y
+                sign_y = 1 if tmp_Y > 0 else -1
+            
+    
+    #apply sign to the absoulte max values
+    max_x = max_abs_x * sign_x
+    max_y = max_abs_y * sign_y
+
+    # center of the area
+    center = ((max_x + init_pos[0])/2, (max_y + init_pos[1])/2)
+
+    # create a radius to spawn the robot at a safe distance
+    if(max_abs_x >=max_abs_y): 
+        radius = 1.2*np.sqrt(2*(max_x - center[0])*(max_x - center[0]))
+    else:                      
+        radius = 1.2*np.sqrt(2*(max_y - center[1])*(max_y - center[1]))
+    
+    return scene, radius, center
+
+
+def add_world_of_pyramid(model_file_path,
+                    init_pos=[1.0, 0.0, 0.0],
+                    yaw=0.0,
+                    width=5,
+                    max_height=0.15,
+                    length=5,
+                    stair_nums=5):
+    scene = xml_et.parse(model_file_path)
+    root = scene.getroot()
+    worldbody = root.find("worldbody")
+    asset = root.find("asset")
+
+    # variables to calculate the area of boxes
+    max_abs_x = 0
+    sign_x = 0  
+    max_abs_y = 0
+    sign_y = 0
+
+    local_pos = [0.0, 0.0, -0.05]
+    height_rand = np.random.uniform(0.08, max_height, 1)
+    stride_rand = np.random.uniform(0.5, 1.0, 1)
+    for i in range(stair_nums):
+        local_pos[2] += height_rand[0] 
+        x, y, _ = Rotation.from_euler('xyz', [0, 0, yaw]).as_matrix() @ local_pos
+        new_width = width - stride_rand[0] * i
+        new_length = length - stride_rand[0] * i
+        
+
+        
+        add_box(asset, worldbody, [x + init_pos[0], y + init_pos[1], local_pos[2]],
+                    [0.0, 0.0, yaw], [new_width, new_length, height_rand[0]])
+        
+        # The first box - the one at the bottom - is the largest one
+        if(i == 0):
+            max_abs_x = abs(x + init_pos[0] + new_width/2.)
+            max_abs_y = abs(y + init_pos[1] + new_length/2.)
+            center = (x + init_pos[0], y + init_pos[1])
+        
+
+    # create a radius to spawn the robot at a safe distance
+    if(max_abs_x >=max_abs_y): 
+        radius = 1.2*np.sqrt(2*(max_abs_x - center[0])*(max_abs_x - center[0]))
+    else:                      
+        radius = 1.2*np.sqrt(2*(max_abs_y - center[1])*(max_abs_y - center[1]))
+    
+    
+    return scene, radius, center

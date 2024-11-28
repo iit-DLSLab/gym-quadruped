@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import mujoco as mj
 import numpy as np
 import os
@@ -35,17 +37,16 @@ class Camera:
         self._scene = mj.MjvScene(self._model, maxgeom=10_000)
 
         self._image = np.zeros((self._height, self._width, 3), dtype=np.uint8)
+        self._depth_plane = np.zeros((self._height, self._width, 1), dtype=np.float32)
         self._depth_image = np.zeros((self._height, self._width, 1), dtype=np.float32)
         self._seg_id_image = np.zeros((self._height, self._width, 3), dtype=np.float32)
         self._point_cloud = np.zeros((self._height, self._width, 1), dtype=np.float32)
 
-        self._last_image = np.zeros((self._height, self._width, 3), dtype=np.uint8)
-        self._last_depth_image = np.zeros((self._height, self._width, 1), dtype=np.float32)
-        self._last_seg_id_image = np.zeros((self._height, self._width, 3), dtype=np.float32)
-        self._last_point_cloud = np.zeros((self._height, self._width, 1), dtype=np.float32)
 
         timestamp = str(datetime.now())
         timestamp = timestamp.replace(":", "_").replace(" ", "_")
+
+        self.K = self.intrinsic_mat
 
         self._save_dir = os.path.join(self._save_dir, "data_" + timestamp)
 
@@ -180,7 +181,7 @@ class Camera:
         """Return the captured RGB image."""
         self._renderer.update_scene(self._data, camera=self.name)
         self._image = self._renderer.render()
-        self._last_image = self._image
+        self._image = cv2.cvtColor(self._image, cv2.COLOR_BGR2RGB)
         return self._image
 
     @property
@@ -188,8 +189,12 @@ class Camera:
         """Return the captured depth image."""
         self._renderer.update_scene(self._data, camera=self.name)
         self._renderer.enable_depth_rendering()
-        self._depth_image = self._renderer.render()
-        self._renderer.disable_depth_rendering()
+        self._depth_plane = self._renderer.render()
+        i_indices, j_indices = np.meshgrid(np.arange(self.height), np.arange(self.width), indexing='ij')
+        x_camera = (i_indices - self.K[0][2]) * self._depth_plane / self.K[0][0]
+        y_camera = (j_indices - self.K[1][2]) * self._depth_plane / self.K[1][1]
+        self._depth_image = np.sqrt(self._depth_plane ** 2 + x_camera ** 2 + y_camera ** 2)
+        self._renderer.disable_depth_rendering() 
         return self._depth_image
 
     @property
@@ -202,7 +207,6 @@ class Camera:
             (self.height, self.width)
             )
         self._renderer.disable_segmentation_rendering()
-        self._last_seg_id_image = self._seg_id_image
         return self._seg_id_image
 
     @property
