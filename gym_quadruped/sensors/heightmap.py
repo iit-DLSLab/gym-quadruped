@@ -1,8 +1,9 @@
-# Description: This script is used to simulate an heightmap based on elevation data for mujoco simulation to be used inside the quadruped_pympc enviroment
+# Description: This module class is used to simulate an heightmap based on elevation data for mujoco simulation to be used inside the quadruped_pympc enviroment
 
 # Authors:
-# Dessy Giovanni.
+# - Dessy Giovanni.
 
+from __future__ import annotations
 import mujoco.viewer
 import mujoco
 

@@ -5,8 +5,6 @@ import numpy as np
 from mujoco.viewer import Handle
 from scipy.spatial.transform import Rotation
 
-from ..quadruped_utils import LegsAttr
-
 
 def cross2(a: np.ndarray, b: np.ndarray) -> np.ndarray:  # See https://github.com/microsoft/pylance-release/issues/3277
     return np.cross(a, b)
@@ -31,6 +29,7 @@ def render_vector(viewer: Handle,
     Returns:
         int: The id of the geometry.
     """
+    if viewer is None: return -1
     if geom_id < 0:
         # Instantiate a new geometry
         geom = mujoco.MjvGeom()
@@ -155,6 +154,10 @@ def render_line(viewer: Handle, initial_point, target_point, width, color, geom_
         mat=ori_mat.flatten(),
         rgba=color
         )
+
+    geom.category = mujoco.mjtCatBit.mjCAT_DECOR
+    geom.segid = -1
+    geom.objid = -1
 
     return geom_id
 
