@@ -48,27 +48,30 @@
 
       <!-- trunk visual mesh -->
       <geom class="visual" type="mesh" mesh="mini_body" contype="0" conaffinity="0"/>
+      <geom class="collision" type="mesh" mesh="mini_body" contype="0" conaffinity="0"/>
       
       <body name="FL_hip" pos="0.19 0.049 0">
         <inertial pos="0 0.036 0" quat="0.564242 0.568689 0.421431 0.424993" mass="0.54" diaginertia="0.000577158 0.000443992 0.00036385"/>
         <joint name="FL_hip_joint" pos="0 0 0" axis="1 0 0"/>
         
-        <!-- FL hip visual mesh -->
+        <!-- FL hip visual and collision mesh -->
         <geom class="visual" pos="-0.055 0 0" quat="0.707105 0 0 -0.707108" type="mesh" mesh="mini_abad"/>
         
         <body name="FL_thigh" pos="0 0.062 0">
           <inertial pos="0 0.016 -0.02" quat="0.707107 0 0 0.707107" mass="0.634" diaginertia="0.002103 0.001983 0.000408"/>
           <joint name="FL_thigh_joint" pos="0 0 0" axis="0 -1 0"/>
           
-          <!-- FL thigh visual mesh -->
+          <!-- FL thigh visual and collision mesh -->
           <geom class="visual" quat="0.707105 0 -0.707108 0" type="mesh" mesh="mini_upper_link"/>
+          <geom class="collision" quat="0.707105 0 -0.707108 0" type="mesh" mesh="mini_upper_link"/>
           
           <body name="FL_calf" pos="0 0 -0.209">
             <inertial pos="0 0 -0.188673" quat="0.707107 0 0 0.707107" mass="0.214" diaginertia="0.000310727 0.000307727 3.1e-05"/>
             <joint name="FL_calf_joint" pos="0 0 0" axis="0 -1 0"/>
             
-            <!-- FL calf visual mesh -->
+            <!-- FL visual and collision mesh -->
             <geom class="visual" quat="3.26795e-07 0 1 0" type="mesh" mesh="mini_lower_link"/>
+            <geom class="collision" quat="3.26795e-07 0 1 0" type="mesh" mesh="mini_lower_link"/>
             
             <!-- FL foot collision -->
             <geom class="collision" name="FL" size="0.015" pos="0 0 -0.18"/>
@@ -81,22 +84,25 @@
         <inertial pos="0 -0.036 0" quat="0.564242 0.568689 0.421431 0.424993" mass="0.54" diaginertia="0.000577158 0.000443992 0.00036385"/>
         <joint name="FR_hip_joint" pos="0 0 0" axis="1 0 0"/>
         
-        <!-- FR hip visual mesh -->
+        <!-- FR hip visual and collision mesh -->
         <geom class="visual" pos="-0.055 0 0" quat="2.31078e-07 0.707105 0.707108 2.31079e-07" type="mesh" mesh="mini_abad"/>
+        <geom class="collision" pos="-0.055 0 0" quat="2.31078e-07 0.707105 0.707108 2.31079e-07" type="mesh" mesh="mini_abad"/>
         
         <body name="FR_thigh" pos="0 -0.062 0">
           <inertial pos="0 -0.016 -0.02" quat="0.707107 0 0 0.707107" mass="0.634" diaginertia="0.002103 0.001983 0.000408"/>
           <joint name="FR_thigh_joint" pos="0 0 0" axis="0 -1 0"/>
           
-          <!-- FR thigh visual mesh -->
+          <!-- FR thigh visual and collision mesh -->
           <geom class="visual" quat="0.707105 0 -0.707108 0" type="mesh" mesh="mini_upper_link"/>
+          <geom class="collision" quat="0.707105 0 -0.707108 0" type="mesh" mesh="mini_upper_link"/>
           
           <body name="FR_calf" pos="0 0 -0.209">
             <inertial pos="0 0 -0.188673" quat="0.707107 0 0 0.707107" mass="0.214" diaginertia="0.000310727 0.000307727 3.1e-05"/>
             <joint name="FR_calf_joint" pos="0 0 0" axis="0 -1 0"/>
             
-            <!-- FR calf visual mesh -->
+            <!-- FR calf visual and collision mesh -->
             <geom class="visual" quat="3.26795e-07 0 1 0" type="mesh" mesh="mini_lower_link"/>
+            <geom class="collision" quat="3.26795e-07 0 1 0" type="mesh" mesh="mini_lower_link"/>
             
             <!-- FR foot collision -->
             <geom class="collision" name="FR" size="0.015" pos="0 0 -0.18"/>
@@ -109,22 +115,25 @@
         <inertial pos="0 0.036 0" quat="0.564242 0.568689 0.421431 0.424993" mass="0.54" diaginertia="0.000577158 0.000443992 0.00036385"/>
         <joint name="RL_hip_joint" pos="0 0 0" axis="1 0 0"/>
         
-        <!-- RL hip visual mesh -->
+        <!-- RL hip visual and collision mesh -->
         <geom class="visual" pos="0.055 0 0" quat="2.31078e-07 0.707105 -0.707108 -2.31079e-07" type="mesh" mesh="mini_abad"/>
+        <geom class="collision" pos="0.055 0 0" quat="2.31078e-07 0.707105 -0.707108 -2.31079e-07" type="mesh" mesh="mini_abad"/>
         
         <body name="RL_thigh" pos="0 0.062 0">
           <inertial pos="0 0.016 -0.02" quat="0.707107 0 0 0.707107" mass="0.634" diaginertia="0.002103 0.001983 0.000408"/>
           <joint name="RL_thigh_joint" pos="0 0 0" axis="0 -1 0"/>
           
-          <!-- RL thgih visual mesh -->
+          <!-- RL thigh visual and collision mesh -->
           <geom class="visual" quat="0.707105 0 -0.707108 0" type="mesh" mesh="mini_upper_link"/>
+          <geom class="collision" quat="0.707105 0 -0.707108 0" type="mesh" mesh="mini_upper_link"/>
           
           <body name="RL_calf" pos="0 0 -0.209">
             <inertial pos="0 0 -0.188673" quat="0.707107 0 0 0.707107" mass="0.214" diaginertia="0.000310727 0.000307727 3.1e-05"/>
             <joint name="RL_calf_joint" pos="0 0 0" axis="0 -1 0"/>
             
-            <!-- RL calf visual mesh -->
+            <!-- RL calf visual and collision mesh -->
             <geom class="visual" quat="3.26795e-07 0 1 0" type="mesh" mesh="mini_lower_link"/>
+            <geom class="collision" quat="3.26795e-07 0 1 0" type="mesh" mesh="mini_lower_link"/>
             
             <!-- RL foot collision mesh -->
             <geom class="collision" name="RL" size="0.015" pos="0 0 -0.18"/>
@@ -137,22 +146,25 @@
         <inertial pos="0 -0.036 0" quat="0.564242 0.568689 0.421431 0.424993" mass="0.54" diaginertia="0.000577158 0.000443992 0.00036385"/>
         <joint name="RR_hip_joint" pos="0 0 0" axis="1 0 0"/>
         
-        <!-- RR hip visual mesh -->
+        <!-- RR hip visual and collision mesh -->
         <geom class="visual" pos="0.055 0 0" quat="0.707105 0 0 0.707108" type="mesh" mesh="mini_abad"/>
-        
+        <geom class="collision" pos="0.055 0 0" quat="0.707105 0 0 0.707108" type="mesh" mesh="mini_abad"/>
+
         <body name="RR_thigh" pos="0 -0.062 0">
           <inertial pos="0 -0.016 -0.02" quat="0.707107 0 0 0.707107" mass="0.634" diaginertia="0.002103 0.001983 0.000408"/>
           <joint name="RR_thigh_joint" pos="0 0 0" axis="0 -1 0"/>
           
-          <!-- RR thigh visual mesh -->
+          <!-- RR thigh visual and collision mesh -->
           <geom class="visual" quat="0.707105 0 -0.707108 0" type="mesh" mesh="mini_upper_link"/>
+          <geom class="collision" quat="0.707105 0 -0.707108 0" type="mesh" mesh="mini_upper_link"/>
           
           <body name="RR_calf" pos="0 0 -0.209">
             <inertial pos="0 0 -0.188673" quat="0.707107 0 0 0.707107" mass="0.214" diaginertia="0.000310727 0.000307727 3.1e-05"/>
             <joint name="RR_calf_joint" pos="0 0 0" axis="0 -1 0"/>
             
-            <!-- RR calf visual mesh -->
+            <!-- RR calf visual and collision mesh -->
             <geom class="visual" quat="3.26795e-07 0 1 0" type="mesh" mesh="mini_lower_link"/>
+            <geom class="collision" quat="3.26795e-07 0 1 0" type="mesh" mesh="mini_lower_link"/>
             
             <!-- RR foot collision -->
             <geom class="collision" name="RR" size="0.015" pos="0 0 -0.18"/>
