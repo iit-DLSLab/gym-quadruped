@@ -20,6 +20,8 @@ from gym_quadruped.utils.mujoco.visual import change_robot_appearance, render_gh
 from gym_quadruped.utils.quadruped_utils import (LegsAttr, configure_observation_space_representations,
                                                  configure_observation_space, extract_mj_joint_info)
 
+from gym_quadruped.utils.mujoco.terrain import add_world_of_boxes, add_world_of_pyramid
+
 BASE_OBS = ['base_pos', 'base_lin_vel', 'base_lin_vel_err', 'base_lin_acc', 'base_ang_vel', 'base_ang_vel_err',
             'base_ori_euler_xyz', 'base_ori_quat_wxyz', 'base_ori_SO3', 'gravity_vector']
 BASE_OBS_BASE_FRAME = ['base_lin_vel:base', 'base_lin_vel_err:base', 'base_lin_acc:base', 'base_ang_vel:base']
