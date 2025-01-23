@@ -23,9 +23,9 @@ class IMU:
                accel_name,
                gyro_name,
                imu_site_name,
-               acc_noise: float = 0.01,
+               accel_noise: float = 0.01,
                gyro_noise: float = 0.01,
-               acc_bias: float = 0.01,
+               accel_bias: float = 0.01,
                gyro_bias: float = 0.01):
       '''
       Imu constructor
