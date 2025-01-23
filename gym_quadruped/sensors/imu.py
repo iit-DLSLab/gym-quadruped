@@ -102,37 +102,6 @@ class IMU:
     gyro +=  dt * self._imu_accel_bias + base_ang_vel_noise
 
     return gyro, base_ang_vel_noise, self._imu_gyro_bias
-  
-#=============================================================================== 
-  def _GetSensorId(self, sensor_name) -> int:
-    return self._mj_model.sensor(name=sensor_name).id
-
-#=============================================================================== 
-  def _BuildIMUFrame(self) -> np.array:
-    '''
-    Build IMU frame w.r.t to the base frame. This should be called only once
-    '''
-    # Build Inverse of IMU frame
-    imu_pos = self._mj_data.site(self._imu_site_id).xpos
-    imu_frame = self._mj_data.site(self._imu_site_id).xmat.reshape(3, 3)
-    imu_frame = Rotation.from_matrix(imu_frame)
-
-    # Create inverse of the IMU frame
-    X_imu = np.eye(4)
-    X_imu[0:3, 0:3] = imu_frame.as_matrix()
-    X_imu[0:3, 3] = imu_pos
-
-    # Build Body frame
-    com_pos = self._mj_data.qpos[0:3]  # world frame
-    quat_wxyz = self._mj_data.qpos[3:7]  # world frame (wxyz) mujoco convention
-    quat_xyzw = np.roll(quat_wxyz, -1)  # SciPy convention (xyzw)
-    X_B_inv = np.eye(4)
-    X_B_inv[0:3, 0:3] = Rotation.from_quat(quat_xyzw).as_matrix().T
-    X_B_inv[0:3, 3] = -np.dot(X_B_inv[0:3, 0:3], com_pos)
-
-    X = np.dot(X_B_inv, X_imu)
-
-    return X
 
 #=============================================================================== 
   def GetIMUFrame(self) -> np.array:
@@ -216,3 +185,34 @@ class IMU:
     site_id = self._mj_model.site(name=site_name).id
 
     return site_id
+
+#=============================================================================== 
+  def _GetSensorId(self, sensor_name) -> int:
+    return self._mj_model.sensor(name=sensor_name).id
+
+#=============================================================================== 
+  def _BuildIMUFrame(self) -> np.array:
+    '''
+    Build IMU frame w.r.t to the base frame. This should be called only once
+    '''
+    # Build Inverse of IMU frame
+    imu_pos = self._mj_data.site(self._imu_site_id).xpos
+    imu_frame = self._mj_data.site(self._imu_site_id).xmat.reshape(3, 3)
+    imu_frame = Rotation.from_matrix(imu_frame)
+
+    # Create inverse of the IMU frame
+    X_imu = np.eye(4)
+    X_imu[0:3, 0:3] = imu_frame.as_matrix()
+    X_imu[0:3, 3] = imu_pos
+
+    # Build Body frame
+    com_pos = self._mj_data.qpos[0:3]  # world frame
+    quat_wxyz = self._mj_data.qpos[3:7]  # world frame (wxyz) mujoco convention
+    quat_xyzw = np.roll(quat_wxyz, -1)  # SciPy convention (xyzw)
+    X_B_inv = np.eye(4)
+    X_B_inv[0:3, 0:3] = Rotation.from_quat(quat_xyzw).as_matrix().T
+    X_B_inv[0:3, 3] = -np.dot(X_B_inv[0:3, 0:3], com_pos)
+
+    X = np.dot(X_B_inv, X_imu)
+
+    return X
