@@ -25,8 +25,8 @@ class IMU:
                imu_site_name,
                accel_noise: float = 0.01,
                gyro_noise: float = 0.01,
-               accel_bias: float = 0.01,
-               gyro_bias: float = 0.01):
+               accel_bias_rate: float = 0.01,
+               gyro_bias_rate: float = 0.01):
       '''
       Imu constructor
 
@@ -45,8 +45,8 @@ class IMU:
 
       self._accel_noise = accel_noise
       self._gyro_noise = gyro_noise
-      self._accel_bias_drift = accel_bias
-      self._gyro_bias_drift = gyro_bias
+      self._accel_bias_drift = accel_bias_rate
+      self._gyro_bias_drift = gyro_bias_rate
 
       self._accel_name = accel_name
       self._gyro_name = gyro_name
