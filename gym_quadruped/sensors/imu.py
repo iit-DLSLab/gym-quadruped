@@ -43,9 +43,9 @@ class IMU:
       self._mj_model = mj_model
       self._mj_data = mj_data
 
-      self._accel_noise = acc_noise
+      self._accel_noise = accel_noise
       self._gyro_noise = gyro_noise
-      self._accel_bias_drift = acc_bias
+      self._accel_bias_drift = accel_bias
       self._gyro_bias_drift = gyro_bias
 
       self._accel_name = accel_name
