@@ -51,9 +51,9 @@ class IMU:
       self._accel_name = accel_name
       self._gyro_name = gyro_name
 
-      self._accel_id = self._GetSensorId(accel_name)
-      self._gyro_id = self._GetSensorId(gyro_name)
-      self._imu_site_id = self._GetSiteId(imu_site_name)
+      self._accel_id = self._get_sensor_id(accel_name)
+      self._gyro_id = self._get_sensor_id(gyro_name)
+      self._imu_site_id = self._get_site_id(imu_site_name)
       
       # Store the bias of the IMU
       self._imu_gyro_bias = np.zeros(3)
@@ -62,13 +62,14 @@ class IMU:
       # Build IMU frame w.r.t to the base frame
       # this is a geometric transformation from frame b 
       # to frame i
-      self.i_X_b = self._BuildIMUFrame()
+      self.i_X_b = self._build_imu_frame()
 
       # Turn off to inspect data
       self._show = False
 
 #=============================================================================== 
-  def GetAccel(self, dt = 1.0) -> np.array:
+  @property
+  def get_accel(self, dt = 1.0) -> tuple:
     '''
     Get current linear acceleration measured by the IMU
     '''
@@ -89,7 +90,8 @@ class IMU:
     return accel, base_lin_acc_noise, self._imu_accel_bias
 
 #=============================================================================== 
-  def GetGyro(self, dt = 1.0) -> np.array:
+  @property
+  def get_gyro(self, dt = 1.0) -> np.array:
     '''
     Get current angular velocity measured by the IMU
     '''
@@ -104,14 +106,15 @@ class IMU:
     return gyro, base_ang_vel_noise, self._imu_gyro_bias
 
 #=============================================================================== 
-  def GetIMUFrame(self) -> np.array:
+  @property
+  def get_imu_frame(self) -> np.array:
     '''
     Get IMU frame w.r.t to the base frame
     '''
     return self.i_X_b
 
 #=============================================================================== 
-  def PrepareToShow(self):
+  def prepare2show(self):
     '''
     Create canvas and legends for the IMU data
     '''
@@ -147,7 +150,7 @@ class IMU:
     self.gyro_line_bias_x = gyro_line_bias
 
 #=============================================================================== 
-  def Show(self, time, accel_noise, gyro_noise, accel_bias, gyro_bias):
+  def show(self, time, accel_noise, gyro_noise, accel_bias, gyro_bias):
     '''
     Show the IMU data in the canvas
     '''
@@ -181,17 +184,17 @@ class IMU:
     plt.pause(0.001)
 
 #=============================================================================== 
-  def _GetSiteId(self, site_name) -> int:
+  def _get_site_id(self, site_name) -> int:
     site_id = self._mj_model.site(name=site_name).id
 
     return site_id
 
 #=============================================================================== 
-  def _GetSensorId(self, sensor_name) -> int:
+  def _get_sensor_id(self, sensor_name) -> int:
     return self._mj_model.sensor(name=sensor_name).id
 
 #=============================================================================== 
-  def _BuildIMUFrame(self) -> np.array:
+  def _build_imu_frame(self) -> np.array:
     '''
     Build IMU frame w.r.t to the base frame. This should be called only once
     '''

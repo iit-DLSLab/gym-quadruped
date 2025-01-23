@@ -42,16 +42,17 @@ imu = IMU(mj_model=env.mjModel,
           accel_name="Body_Acc",
           gyro_name="Body_Gyro",
           imu_site_name="imu")
-imu.PrepareToShow()
+
+imu.prepare2show()
 
 dt = 0.1
 t0 = 0.0
 while True:
-  imu_accel, accel_noise, accel_bias  = imu.GetAccel()
-  imu_gyro, gyro_noise, gyro_bias  = imu.GetGyro()
-  X = imu.GetIMUFrame()
+  imu_accel, accel_noise, accel_bias  = imu.get_accel
+  imu_gyro, gyro_noise, gyro_bias  = imu.get_gyro
+  X = imu.get_imu_frame
 
-  imu.Show(t0,
+  imu.show(t0,
            accel_noise,
            gyro_noise,
            accel_bias,
