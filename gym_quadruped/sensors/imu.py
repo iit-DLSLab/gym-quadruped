@@ -1,5 +1,5 @@
 '''
-Copyright (c) 2025 Hilton-Santana <https://my.github.com/Hilton-Marques>
+Copyright (c) 2025 Hilton-Santana <https://my.github.com/Hilton-Santana>
 
 Created Date: Saturday, January 18th 2025, 4:41:25 pm
 Author: Hilton-Santana hiltonmarquess@gmail.com
