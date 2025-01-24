@@ -1,8 +1,8 @@
 '''
-Copyright (c) 2025 Hilton-Marques <https://my.github.com/Hilton-Marques>
+Copyright (c) 2025 Hilton-Santana <https://my.github.com/Hilton-Marques>
 
 Created Date: Saturday, January 18th 2025, 4:41:25 pm
-Author: Hilton-Marques
+Author: Hilton-Santana hiltonmarquess@gmail.com
 
 Description: IMU class which is a wrapper for the accelerometer and
 gyroscope defined in Mujoco

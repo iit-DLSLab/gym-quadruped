@@ -1,8 +1,8 @@
 '''
-Copyright (c) 2025 Hilton-Marques <https://my.github.com/Hilton-Marques>
+Copyright (c) 2025 Hilton-Santana <https://my.github.com/Hilton-Marques>
 
 Created Date: Saturday, January 18th 2025, 4:08:51 pm
-Author: Hilton-Marques
+Author: Hilton-Santana hiltonmarquess@gmail.com
 
 Description: A simple example of using the Aliengo environment with an IMU sensor.
 HISTORY:
