@@ -54,7 +54,7 @@ class IMU:
       self._accel_id = self._get_sensor_id(accel_name)
       self._gyro_id = self._get_sensor_id(gyro_name)
       self._imu_site_id = self._get_site_id(imu_site_name)
-      
+
       # Store the bias of the IMU
       self._imu_gyro_bias = np.zeros(3)
       self._imu_accel_bias = np.zeros(3)
@@ -81,7 +81,7 @@ class IMU:
     accel_id = self._accel_id
     accel = self._mj_data.sensordata[accel_id:accel_id + 3] 
     # another option is with 
-    #accel = self._mj_data.sensor(self._accel_name).data
+    #accel_2 = self._mj_data.sensor(self._accel_name).data
     # but I believe it is faster to use the sensordata
 
     # add noise and biases to the real value
@@ -100,6 +100,8 @@ class IMU:
 
     gyro_id = self._gyro_id
     gyro = self._mj_data.sensordata[gyro_id:gyro_id + 3]
+    #gyro_2 = self._mj_data.sensor(self._gyro_name).data
+
     # add noise and biases to the real value
     gyro +=  dt * self._imu_accel_bias + base_ang_vel_noise
 
@@ -191,7 +193,13 @@ class IMU:
 
 #=============================================================================== 
   def _get_sensor_id(self, sensor_name) -> int:
-    return self._mj_model.sensor(name=sensor_name).id
+    accel_id = self._mj_model.sensor(name=sensor_name).id
+    # Find the starting index of the sensor in the sensor data
+    start = 0
+    for i in range(accel_id):
+        start += self._mj_model.sensor(i).dim[0]
+
+    return start
 
 #=============================================================================== 
   def _build_imu_frame(self) -> np.array:
