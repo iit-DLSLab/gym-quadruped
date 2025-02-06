@@ -218,9 +218,10 @@ def extract_mj_joint_info(model: mujoco.MjModel) -> OrderedDict[str, JointInfo]:
     return joint_info
 
 
+
 def configure_observation_space(
-        mj_model: mujoco.MjModel, obs_names: Sequence[str]
-        ) -> [spaces.Space, dict[str, slice]]:
+    mj_model: mujoco.MjModel, obs_names: Sequence[str]
+    ) -> [spaces.Space]:
     """Configures the observation space for the environment based on the provided state observation names.
 
     Args:
@@ -230,119 +231,94 @@ def configure_observation_space(
 
     Returns:
     -------
-    gym.Space: The environment state observation space.
-    dict: A dictionary mapping each state observation name to its indices in the observation space.
+    gym.spaces.Dict: A dictionary with a gym.spaces.Box for each observation name.
     """
-    obs_dim, last_idx = 0, 0
+    obs_spaces = {}
 
-    obs_lim_min, obs_lim_max = [], []
     qpos_lim_min, qpos_lim_max = mj_model.jnt_range[:, 0], mj_model.jnt_range[:, 1]
     tau_lim_min, tau_lim_max = mj_model.actuator_ctrlrange[:, 0], mj_model.actuator_ctrlrange[:, 1]
 
-    obs_idx = {k: None for k in obs_names}
     for obs_name in obs_names:
-        # Generalized position, velocity, and force (torque) spaces
         if obs_name == 'qpos':
-            obs_dim += mj_model.nq
-            obs_lim_max.extend([np.inf] * 7 + qpos_lim_max[1:].tolist())  # Ignore the base position
-            obs_lim_min.extend([-np.inf] * 7 + qpos_lim_min[1:].tolist())  # Ignore the base position
+            obs_dim = mj_model.nq
+            obs_lim_max = [np.inf] * 7 + qpos_lim_max[1:].tolist()  # Ignore the base position
+            obs_lim_min = [-np.inf] * 7 + qpos_lim_min[1:].tolist()  # Ignore the base position
         elif obs_name == 'qvel':
-            obs_dim += mj_model.nv
-            obs_lim_max.extend([np.inf] * mj_model.nv)
-            obs_lim_min.extend([-np.inf] * mj_model.nv)
+            obs_dim = mj_model.nv
+            obs_lim_max = [np.inf] * obs_dim
+            obs_lim_min = [-np.inf] * obs_dim
         elif obs_name == 'tau_ctrl_setpoint':
-            obs_dim += mj_model.nu
-            obs_lim_max.extend(tau_lim_max)
-            obs_lim_min.extend(tau_lim_min)
-        # Joint-space position and velocity spaces
-        elif obs_name == 'qpos_js':  # Joint space position configuration
-            obs_dim += mj_model.nq - 7
-            obs_lim_max.extend(qpos_lim_max[1:])
-            obs_lim_min.extend(qpos_lim_min[1:])
-        elif obs_name == 'qvel_js':  # Joint space velocity configuration
-            obs_dim += mj_model.nv - 6
-            obs_lim_max.extend([np.inf] * (mj_model.nv - 6))
-            obs_lim_min.extend([-np.inf] * (mj_model.nv - 6))
-        # Base position and velocity configurations (in world frame)
+            obs_dim = mj_model.nu
+            obs_lim_max = tau_lim_max
+            obs_lim_min = tau_lim_min
+        elif obs_name == 'qpos_js':
+            obs_dim = mj_model.nq - 7
+            obs_lim_max = qpos_lim_max[1:]
+            obs_lim_min = qpos_lim_min[1:]
+        elif obs_name == 'qvel_js':
+            obs_dim = mj_model.nv - 6
+            obs_lim_max = [np.inf] * obs_dim
+            obs_lim_min = [-np.inf] * obs_dim
         elif obs_name == 'base_pos':
-            if "qpos" in obs_names:
-                log.debug("base_pos is redundant with additional obs qpos. base_pos = qpos[0:3]")
-            obs_dim += 3
-            obs_lim_max.extend([np.inf] * 3)
-            obs_lim_min.extend([-np.inf] * 3)
-        elif 'base_lin_vel' in obs_name:  # base_lin_vel / base_lin_vel:base (base frame)
-            if "qvel" in obs_names:
-                log.debug("base_lin_vel is redundant with additional obs qvel. base_lin_vel = qvel[0:3]")
-            obs_dim += 3
-            obs_lim_max.extend([np.inf] * 3)
-            obs_lim_min.extend([-np.inf] * 3)
-        elif 'base_lin_acc' in obs_name:  # base_lin_acc / base_lin_acc:base (base frame)
-            obs_dim += 3
-            obs_lim_max.extend([np.inf] * 3)
-            obs_lim_min.extend([-np.inf] * 3)
+            obs_dim = 3
+            obs_lim_max = [np.inf] * obs_dim
+            obs_lim_min = [-np.inf] * obs_dim
+        elif 'base_lin_vel' in obs_name:
+            obs_dim = 3
+            obs_lim_max = [np.inf] * obs_dim
+            obs_lim_min = [-np.inf] * obs_dim
+        elif 'base_lin_acc' in obs_name:
+            obs_dim = 3
+            obs_lim_max = [np.inf] * obs_dim
+            obs_lim_min = [-np.inf] * obs_dim
         elif 'base_ang_vel' in obs_name:
-            if "qvel" in obs_names:
-                log.debug("base_ang_vel is redundant with additional obs qvel. base_ang_vel = qvel[3:6]")
-            obs_dim += 3
-            obs_lim_max.extend([np.inf] * 3)
-            obs_lim_min.extend([-np.inf] * 3)
+            obs_dim = 3
+            obs_lim_max = [np.inf] * obs_dim
+            obs_lim_min = [-np.inf] * obs_dim
         elif 'base_ori_euler_xyz' in obs_name:
-            if "qpos" in obs_names:
-                log.debug(
-                    "base_ori_euler_xyz is redundant with additional obs qpos. base_ori_euler_xyz = qpos[3:6]")
-            obs_dim += 3
-            obs_lim_max.extend([np.inf] * 3)
-            obs_lim_min.extend([-np.inf] * 3)
+            obs_dim = 3
+            obs_lim_max = [np.inf] * obs_dim
+            obs_lim_min = [-np.inf] * obs_dim
         elif obs_name == 'base_ori_quat_wxyz':
-            if "qpos" in obs_names:
-                log.debug(
-                    "base_ori_quat_wxyz is redundant with additional obs qpos. base_ori_quat_wxyz = qpos[3:7]")
-            obs_dim += 4
-            obs_lim_max.extend([np.inf] * 4)
-            obs_lim_min.extend([-np.inf] * 4)
+            obs_dim = 4
+            obs_lim_max = [np.inf] * obs_dim
+            obs_lim_min = [-np.inf] * obs_dim
         elif obs_name == 'base_ori_SO3':
-            if "qpos" in obs_names:
-                log.debug("base_ori_SO3 is redundant with additional obs qpos. base_ori_SO3 = qpos[3:7]")
-            obs_dim += 9
-            obs_lim_max.extend([np.inf] * 9)
-            obs_lim_min.extend([-np.inf] * 9)
-        # Feet positions and velocities
-        elif 'feet_pos' in obs_name:  # feet_pos:frame := feet_pos:world or feet_pos:base
-            obs_dim += 12
-            obs_lim_max.extend([np.inf] * 12)
-            obs_lim_min.extend([-np.inf] * 12)
-        elif 'feet_vel' in obs_name:  # feet_vel:frame := feet_vel:world or feet_vel:base
-            obs_dim += 12
-            obs_lim_max.extend([np.inf] * 12)
-            obs_lim_min.extend([-np.inf] * 12)
+            obs_dim = 9
+            obs_lim_max = [np.inf] * obs_dim
+            obs_lim_min = [-np.inf] * obs_dim
+        elif 'feet_pos' in obs_name:
+            obs_dim = 12
+            obs_lim_max = [np.inf] * obs_dim
+            obs_lim_min = [-np.inf] * obs_dim
+        elif 'feet_vel' in obs_name:
+            obs_dim = 12
+            obs_lim_max = [np.inf] * obs_dim
+            obs_lim_min = [-np.inf] * obs_dim
         elif obs_name == 'contact_state':
-            obs_dim += 4
-            obs_lim_max.extend([1] * 4)
-            obs_lim_min.extend([0] * 4)
+            obs_dim = 4
+            obs_lim_max = [1] * obs_dim
+            obs_lim_min = [0] * obs_dim
         elif 'contact_forces' in obs_name:
-            obs_dim += 12
-            obs_lim_max.extend([np.inf] * 12)
-            obs_lim_min.extend([-np.inf] * 12)
+            obs_dim = 12
+            obs_lim_max = [np.inf] * obs_dim
+            obs_lim_min = [-np.inf] * obs_dim
         elif 'gravity_vector' in obs_name:
-            obs_dim += 3
-            obs_lim_max.extend([np.inf] * 3)
-            obs_lim_min.extend([-np.inf] * 3)
+            obs_dim = 3
+            obs_lim_max = [np.inf] * obs_dim
+            obs_lim_min = [-np.inf] * obs_dim
         else:
             from gym_quadruped.quadruped_env import QuadrupedEnv
             raise ValueError(f"Invalid observation name: {obs_name}, available obs: {QuadrupedEnv.ALL_OBS}")
-        obs_idx[obs_name] = range(last_idx, obs_dim)
-        last_idx = obs_dim
 
-        if obs_dim != len(obs_lim_max) or obs_dim != len(obs_lim_min):
-            raise ValueError(
-                f"Invalid configuration of observation {obs_name}: \n - obs_dim: {obs_dim} \n"
-                f" - lower_lim_dim: {len(obs_lim_max)} \t - upper_lim_dim: {len(obs_lim_min)}"
-                )
+        obs_spaces[obs_name] = spaces.Box(
+            shape=(obs_dim,),
+            low=np.array(obs_lim_min),
+            high=np.array(obs_lim_max),
+            dtype=np.float32)
 
-    obs_lim_min = np.array(obs_lim_min)
-    obs_lim_max = np.array(obs_lim_max)
-    observation_space = spaces.Box(low=obs_lim_min, high=obs_lim_max, shape=(obs_dim,), dtype=np.float32)
-    return observation_space, obs_idx
+    observation_space = spaces.Dict(obs_spaces)
+    return observation_space
 
 
 def configure_observation_space_representations(

@@ -21,6 +21,7 @@ from gym_quadruped.utils.quadruped_utils import (LegsAttr, configure_observation
                                                  configure_observation_space, extract_mj_joint_info)
 
 from gym_quadruped.utils.mujoco.terrain import add_world_of_boxes, add_world_of_pyramid
+from typing_extensions import deprecated
 
 BASE_OBS = ['base_pos', 'base_lin_vel', 'base_lin_vel_err', 'base_lin_acc', 'base_ang_vel', 'base_ang_vel_err',
             'base_ori_euler_xyz', 'base_ori_quat_wxyz', 'base_ori_SO3', 'gravity_vector']
@@ -189,8 +190,8 @@ class QuadrupedEnv(gym.Env):
 
         # Observation space: __________________________________________________________________________________________
         # Get the Env observation gym.Space, and a dict with the indices of each observation in the state vector
-        self.observation_space, self.state_obs_idx = configure_observation_space(mj_model=self.mjModel,
-                                                                                 obs_names=state_obs_names)
+        self.observation_space = configure_observation_space(mj_model=self.mjModel,
+                                                             obs_names=state_obs_names)
         self.state_obs_names = state_obs_names
 
         self.viewer = None
@@ -874,6 +875,7 @@ class QuadrupedEnv(gym.Env):
                                                                obs_names=self.state_obs_names)
         return obs_reps
 
+    @deprecated("state observation is already a gym.spaces.Dict instance since version 0.0.8")
     def extract_obs_from_state(self, state_like_array: np.ndarray) -> dict[str, np.ndarray]:
         """Extracts the state observation from a state-like array.
 
@@ -888,12 +890,7 @@ class QuadrupedEnv(gym.Env):
         state_obs_dict: (dict) A dictionary with the state observation names as keys and the corresponding
             state observation values as values.
         """
-        state_obs_shape = self.observation_space.shape
-        assert state_like_array.shape[-len(state_obs_shape):] == self.observation_space.shape, \
-            f"Invalid state vector shape: {state_like_array.shape}, expected: (...{self.observation_space.shape})"
-        state_obs_dict = {}
-        # return StateObs(*[state_like_array[..., idx] for idx in self.state_obs_idx.values()])
-        return {obs_name: state_like_array[..., idx] for obs_name, idx in self.state_obs_idx.items()}
+        raise DeprecationWarning("state observation is already a gym.spaces.Dict instance since version 0.0.8")
 
     def _compute_reward(self):
         # Example reward function (to be defined based on the task)
@@ -902,63 +899,63 @@ class QuadrupedEnv(gym.Env):
 
     def _get_obs(self):
         """Returns the state observation based on the specified state observation names."""
-        obs = []
+        state_obs_dict = {}
+        remaining_obs = set(self.observation_space.keys())
         for obs_name in self.state_obs_names:
             frame = 'world' if not obs_name.endswith('base') else 'base'
+            obs_val = None  # Initialize observation value
+
             # Generalized position, velocity, and force (torque) spaces
             if obs_name == 'qpos':
-                obs.append(self.mjData.qpos)
+                obs_val = self.mjData.qpos.copy()
             elif obs_name == 'qvel':
-                obs.append(self.mjData.qvel)
+                obs_val = self.mjData.qvel.copy()
             elif obs_name == 'tau_ctrl_setpoint':
-                obs.append(self.torque_ctrl_setpoint)
-            # Joint-space position and velocity spaces
+                obs_val = self.torque_ctrl_setpoint.copy()
             elif obs_name == 'qpos_js':
-                obs.append(self.mjData.qpos[7:])
+                obs_val = self.mjData.qpos[7:].copy()
             elif obs_name == 'qvel_js':
-                obs.append(self.mjData.qvel[6:])
-            # Base position and velocity configurations (in world frame)
+                obs_val = self.mjData.qvel[6:].copy()
             elif obs_name == 'base_pos':
-                obs.append(self.base_pos)
-            elif 'base_lin_vel_err' in obs_name:
-                obs.append(self.base_lin_vel_err(frame))
+                obs_val = self.base_pos.copy()
             elif 'base_lin_vel' in obs_name:
-                obs.append(self.base_lin_vel(frame))
+                obs_val = self.base_lin_vel(frame).copy()
             elif 'base_lin_acc' in obs_name:
-                obs.append(self.base_lin_acc(frame))
-            elif 'base_ang_vel_err' in obs_name:
-                obs.append(self.base_ang_vel_err(frame))
+                obs_val = self.base_lin_acc(frame).copy()
             elif 'base_ang_vel' in obs_name:
-                obs.append(self.base_ang_vel(frame))
+                obs_val = self.base_ang_vel(frame).copy()
             elif obs_name == 'base_ori_euler_xyz':
-                obs.append(self.base_ori_euler_xyz)
+                obs_val = self.base_ori_euler_xyz.copy()
             elif obs_name == 'base_ori_quat_wxyz':
-                obs.append(self.mjData.qpos[3:7])
+                obs_val = self.mjData.qpos[3:7].copy()
             elif obs_name == 'base_ori_SO3':
-                obs.append(self.base_configuration[0:3, 0:3].flatten())
-            # Feet positions and velocities
-            elif 'feet_pos' in obs_name:  # feet_pos:frame := feet_pos:world or feet_pos:base
-                frame = 'world' if 'base' not in obs_name else 'base'
-                obs.append(np.concatenate(self.feet_pos(frame).to_list(order=self.legs_order), axis=0))
-            elif 'feet_vel' in obs_name:  # feet_vel:frame := feet_vel:world or feet_vel:base
-                frame = 'world' if 'base' not in obs_name else 'base'
-                obs.append(np.concatenate(self.feet_vel(frame).to_list(order=self.legs_order), axis=0))
+                obs_val = self.base_configuration[0:3, 0:3].flatten().copy()
+            elif 'feet_pos' in obs_name:
+                obs_val = np.concatenate(self.feet_pos(frame).to_list(order=self.legs_order), axis=0).copy()
+            elif 'feet_vel' in obs_name:
+                obs_val = np.concatenate(self.feet_vel(frame).to_list(order=self.legs_order), axis=0).copy()
             elif obs_name == 'contact_state':
                 contact_state, _ = self.feet_contact_state()
-                obs.append(np.array(contact_state.to_list()))
+                obs_val = np.array(contact_state.to_list(), dtype=np.float32).copy()
             elif 'contact_forces' in obs_name:
-                frame = 'world' if 'base' not in obs_name else 'base'
                 _, _, contact_forces = self.feet_contact_state(ground_reaction_forces=True, frame=frame)
-                obs.append(np.concatenate(contact_forces.to_list(order=self.legs_order), axis=0))
+                obs_val = np.concatenate(contact_forces.to_list(order=self.legs_order), axis=0).copy()
             elif 'gravity_vector' in obs_name:
-                obs.append(self.gravity_vector)
+                obs_val = self.gravity_vector.copy()
             else:
                 raise ValueError(f"Invalid observation name: {obs_name}, available obs: {self.ALL_OBS}")
 
-        state_obs = np.concatenate(obs, axis=0)
-        assert state_obs.shape == self.observation_space.shape, \
-            f"Invalid state observation shape: {state_obs.shape}, expected: {self.observation_space.shape}"
-        return state_obs
+            assert self.observation_space[obs_name].shape == obs_val.shape, \
+                f"Invalid shape for observation {obs_name}: {obs_val.shape} != {self.observation_space[obs_name].shape}"
+            state_obs_dict[obs_name] = obs_val  # Assign computed observation value to the dictionary
+            remaining_obs.remove(obs_name)  # Remove the observation name from the remaining observations
+
+        if len(remaining_obs) > 0:
+            raise RuntimeError(
+                f"The observations {remaining_obs} are in the observation space but not in the returned obsertation."
+                )
+
+        return state_obs_dict
 
     def _check_for_invalid_contacts(self) -> [bool, dict]:
         """Env termination occurs when a contact is detected on the robot's base."""
@@ -1136,10 +1133,9 @@ if __name__ == '__main__':
             action = env.action_space.sample() * 50  # Sample random action
             state, reward, is_terminated, is_truncated, info = env.step(action=action)
 
-            state_dict = env.extract_obs_from_state(state)
             for state_obs_name in state_observables_names:
-                assert state_obs_name in state_dict, f"Missing state observation: {state_obs_name}"
-                assert state_dict[state_obs_name] is not None, f"Invalid state observation: {state_obs_name}"
+                assert state_obs_name in state, f"Missing state observation: {state_obs_name}"
+                assert state[state_obs_name] is not None, f"Invalid state observation: {state_obs_name}"
 
             if is_terminated:
                 pass
