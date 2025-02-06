@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import logging
 from collections import OrderedDict
 from dataclasses import dataclass, field
 from typing import Any, Sequence
@@ -7,8 +8,6 @@ from typing import Any, Sequence
 import mujoco
 import numpy as np
 from gymnasium import spaces
-
-import logging
 
 log = logging.getLogger(__name__)
 
@@ -51,7 +50,7 @@ class LegsAttr:
     RR: Any
     RL: Any
 
-    order = ['FL', 'FR', 'RL', 'RR']
+    order = ["FL", "FR", "RL", "RR"]
 
     def to_list(self, order=None):
         """Return a list of the leg's attributes in the order specified (or self.order if order=None)."""
@@ -171,7 +170,7 @@ def extract_mj_joint_info(model: mujoco.MjModel) -> OrderedDict[str, JointInfo]:
         # Get the starting index of the joint name in the model.names string
         name_start_index = model.name_jntadr[joint_id]
         # Extract the joint name from the model.names bytes and decode it
-        joint_name = model.names[name_start_index:].split(b'\x00', 1)[0].decode('utf-8')
+        joint_name = model.names[name_start_index:].split(b"\x00", 1)[0].decode("utf-8")
         joint_type = model.jnt_type[joint_id]
         qpos_idx_start = model.jnt_qposadr[joint_id]
         qvel_idx_start = model.jnt_dofadr[joint_id]
@@ -180,9 +179,7 @@ def extract_mj_joint_info(model: mujoco.MjModel) -> OrderedDict[str, JointInfo]:
             joint_nq, joint_nv = 7, 6
         elif joint_type == mujoco.mjtJoint.mjJNT_BALL:
             joint_nq, joint_nv = 4, 3
-        elif joint_type == mujoco.mjtJoint.mjJNT_SLIDE:
-            joint_nq, joint_nv = 1, 1
-        elif joint_type == mujoco.mjtJoint.mjJNT_HINGE:
+        elif joint_type == mujoco.mjtJoint.mjJNT_SLIDE or joint_type == mujoco.mjtJoint.mjJNT_HINGE:
             joint_nq, joint_nv = 1, 1
         else:
             raise RuntimeError(f"Unknown mujoco joint type: {joint_type} available {mujoco.mjtJoint}")
@@ -198,13 +195,14 @@ def extract_mj_joint_info(model: mujoco.MjModel) -> OrderedDict[str, JointInfo]:
             nq=joint_nq,
             nv=joint_nv,
             qpos_idx=qpos_idx,
-            qvel_idx=qvel_idx)
+            qvel_idx=qvel_idx,
+        )
 
     # Iterate over all actuators
     current_dim = 0
     for acutator_idx in range(model.nu):
         name_start_index = model.name_actuatoradr[acutator_idx]
-        act_name = model.names[name_start_index:].split(b'\x00', 1)[0].decode('utf-8')
+        act_name = model.names[name_start_index:].split(b"\x00", 1)[0].decode("utf-8")
         mj_actuator_id = mujoco.mj_name2id(model, mujoco.mjtObj.mjOBJ_ACTUATOR, act_name)
         # Get the joint index associated with the actuator
         joint_id = model.actuator_trnid[mj_actuator_id, 0]
@@ -218,10 +216,7 @@ def extract_mj_joint_info(model: mujoco.MjModel) -> OrderedDict[str, JointInfo]:
     return joint_info
 
 
-
-def configure_observation_space(
-    mj_model: mujoco.MjModel, obs_names: Sequence[str]
-    ) -> [spaces.Space]:
+def configure_observation_space(mj_model: mujoco.MjModel, obs_names: Sequence[str]) -> [spaces.Space]:
     """Configures the observation space for the environment based on the provided state observation names.
 
     Args:
@@ -239,116 +234,100 @@ def configure_observation_space(
     tau_lim_min, tau_lim_max = mj_model.actuator_ctrlrange[:, 0], mj_model.actuator_ctrlrange[:, 1]
 
     for obs_name in obs_names:
-        if obs_name == 'qpos':
+        if obs_name == "qpos":
             obs_dim = mj_model.nq
             obs_lim_max = [np.inf] * 7 + qpos_lim_max[1:].tolist()  # Ignore the base position
             obs_lim_min = [-np.inf] * 7 + qpos_lim_min[1:].tolist()  # Ignore the base position
-        elif obs_name == 'qvel':
+        elif obs_name == "qvel":
             obs_dim = mj_model.nv
             obs_lim_max = [np.inf] * obs_dim
             obs_lim_min = [-np.inf] * obs_dim
-        elif obs_name == 'tau_ctrl_setpoint':
+        elif obs_name == "tau_ctrl_setpoint":
             obs_dim = mj_model.nu
             obs_lim_max = tau_lim_max
             obs_lim_min = tau_lim_min
-        elif obs_name == 'qpos_js':
+        elif obs_name == "qpos_js":
             obs_dim = mj_model.nq - 7
             obs_lim_max = qpos_lim_max[1:]
             obs_lim_min = qpos_lim_min[1:]
-        elif obs_name == 'qvel_js':
+        elif obs_name == "qvel_js":
             obs_dim = mj_model.nv - 6
             obs_lim_max = [np.inf] * obs_dim
             obs_lim_min = [-np.inf] * obs_dim
-        elif obs_name == 'base_pos':
+        elif (
+            obs_name == "base_pos"
+            or "base_lin_vel" in obs_name
+            or "base_lin_acc" in obs_name
+            or "base_ang_vel" in obs_name
+            or "base_ori_euler_xyz" in obs_name
+        ):
             obs_dim = 3
             obs_lim_max = [np.inf] * obs_dim
             obs_lim_min = [-np.inf] * obs_dim
-        elif 'base_lin_vel' in obs_name:
-            obs_dim = 3
-            obs_lim_max = [np.inf] * obs_dim
-            obs_lim_min = [-np.inf] * obs_dim
-        elif 'base_lin_acc' in obs_name:
-            obs_dim = 3
-            obs_lim_max = [np.inf] * obs_dim
-            obs_lim_min = [-np.inf] * obs_dim
-        elif 'base_ang_vel' in obs_name:
-            obs_dim = 3
-            obs_lim_max = [np.inf] * obs_dim
-            obs_lim_min = [-np.inf] * obs_dim
-        elif 'base_ori_euler_xyz' in obs_name:
-            obs_dim = 3
-            obs_lim_max = [np.inf] * obs_dim
-            obs_lim_min = [-np.inf] * obs_dim
-        elif obs_name == 'base_ori_quat_wxyz':
+        elif obs_name == "base_ori_quat_wxyz":
             obs_dim = 4
             obs_lim_max = [np.inf] * obs_dim
             obs_lim_min = [-np.inf] * obs_dim
-        elif obs_name == 'base_ori_SO3':
+        elif obs_name == "base_ori_SO3":
             obs_dim = 9
             obs_lim_max = [np.inf] * obs_dim
             obs_lim_min = [-np.inf] * obs_dim
-        elif 'feet_pos' in obs_name:
+        elif "feet_pos" in obs_name or "feet_vel" in obs_name:
             obs_dim = 12
             obs_lim_max = [np.inf] * obs_dim
             obs_lim_min = [-np.inf] * obs_dim
-        elif 'feet_vel' in obs_name:
-            obs_dim = 12
-            obs_lim_max = [np.inf] * obs_dim
-            obs_lim_min = [-np.inf] * obs_dim
-        elif obs_name == 'contact_state':
+        elif obs_name == "contact_state":
             obs_dim = 4
             obs_lim_max = [1] * obs_dim
             obs_lim_min = [0] * obs_dim
-        elif 'contact_forces' in obs_name:
+        elif "contact_forces" in obs_name:
             obs_dim = 12
             obs_lim_max = [np.inf] * obs_dim
             obs_lim_min = [-np.inf] * obs_dim
-        elif 'gravity_vector' in obs_name:
+        elif "gravity_vector" in obs_name:
             obs_dim = 3
             obs_lim_max = [np.inf] * obs_dim
             obs_lim_min = [-np.inf] * obs_dim
         else:
             from gym_quadruped.quadruped_env import QuadrupedEnv
+
             raise ValueError(f"Invalid observation name: {obs_name}, available obs: {QuadrupedEnv.ALL_OBS}")
 
         obs_spaces[obs_name] = spaces.Box(
-            shape=(obs_dim,),
-            low=np.array(obs_lim_min),
-            high=np.array(obs_lim_max),
-            dtype=np.float32)
+            shape=(obs_dim,), low=np.array(obs_lim_min), high=np.array(obs_lim_max), dtype=np.float32
+        )
 
     observation_space = spaces.Dict(obs_spaces)
     return observation_space
 
 
 def configure_observation_space_representations(
-        robot_name: str,
-        obs_names: Sequence[str]
-        ) -> [spaces.Space, dict[str, slice]]:
+    robot_name: str, obs_names: Sequence[str]
+) -> [spaces.Space, dict[str, slice]]:
     try:
         import morpho_symm
-        from morpho_symm.utils.robot_utils import load_symmetric_system
         from morpho_symm.utils.rep_theory_utils import escnn_representation_form_mapping, group_rep_from_gens
+        from morpho_symm.utils.robot_utils import load_symmetric_system
     except ImportError as e:
         raise ImportError("morpho_symm package is required to configure observation group representations") from e
 
     G = load_symmetric_system(robot_name=robot_name, return_robot=False)
-    rep_Q_js = G.representations['Q_js']  # Representation on joint space position coordinates
-    rep_TqQ_js = G.representations['TqQ_js']  # Representation on joint space velocity coordinates
-    rep_Rd = G.representations['R3']  # Representation on vectors in R^d
-    rep_Rd_pseudo = G.representations['R3_pseudo']  # Representation on pseudo vectors in R^d
-    rep_euler_xyz = G.representations['euler_xyz']  # Representation on Euler angles
+    rep_Q_js = G.representations["Q_js"]  # Representation on joint space position coordinates
+    rep_TqQ_js = G.representations["TqQ_js"]  # Representation on joint space velocity coordinates
+    rep_Rd = G.representations["R3"]  # Representation on vectors in R^d
+    rep_Rd_pseudo = G.representations["R3_pseudo"]  # Representation on pseudo vectors in R^d
+    rep_euler_xyz = G.representations["euler_xyz"]  # Representation on Euler angles
     # TODO: Ensure the limb order in the configuration matches the used order by quadruped gym.
-    rep_kin_three = G.representations['kin_chain']  # Permutation of legs
+    rep_kin_three = G.representations["kin_chain"]  # Permutation of legs
     rep_Rd_on_limbs = rep_kin_three.tensor(rep_Rd)  # Representation on signals R^d on the limbs
-    rep_Rd_on_limbs.name = 'Rd_on_limbs'
+    rep_Rd_on_limbs.name = "Rd_on_limbs"
     rep_Rd_pseudo_on_limbs = rep_kin_three.tensor(rep_Rd_pseudo)  # Representation on pseudo vect R^d on the limbs
-    rep_Rd_pseudo_on_limbs.name = 'Rd_pseudo_on_limbs'
+    rep_Rd_pseudo_on_limbs.name = "Rd_pseudo_on_limbs"
     rep_SO3_flat = {}
     for h in G.elements:
         rep_SO3_flat[h] = np.kron(rep_Rd(h), rep_Rd(~h).T)
     rep_SO3_flat = escnn_representation_form_mapping(G, rep_SO3_flat)
-    rep_SO3_flat.name = 'SO3_flat'
+    rep_SO3_flat.name = "SO3_flat"
 
     # Create a representation for the z dimension alone of the base position
     rep_z = G.irrep(*rep_Rd.irreps[-1])
@@ -356,44 +335,41 @@ def configure_observation_space_representations(
     obs_reps = {k: None for k in obs_names}
     for obs_name in obs_names:
         # Generalized position, velocity, and force (torque) spaces
-        if obs_name == 'qpos':
+        if obs_name == "qpos":
             continue  # Quaternion does not have a left-group action definition.
-        elif obs_name == 'qvel':
+        elif obs_name == "qvel":
             obs_reps[obs_name] = rep_Rd + rep_Rd_pseudo + rep_TqQ_js  # lin_vel , ang_vel, joint_vel
-        elif obs_name == 'tau_ctrl_setpoint':
+        elif obs_name == "tau_ctrl_setpoint":
             obs_reps[obs_name] = rep_TqQ_js
-        elif obs_name == 'qpos_js':  # Joint space position configuration
+        elif obs_name == "qpos_js":  # Joint space position configuration
             obs_reps[obs_name] = rep_Q_js
-        elif obs_name == 'qvel_js':  # Joint space velocity configuration
+        elif obs_name == "qvel_js":  # Joint space velocity configuration
             obs_reps[obs_name] = rep_TqQ_js
-        elif obs_name == 'base_pos':
+        elif obs_name == "base_pos":
             obs_reps[obs_name] = rep_Rd
-        elif obs_name == 'base_pos_z':
+        elif obs_name == "base_pos_z":
             obs_reps[obs_name] = rep_z
-        elif 'base_lin_vel' in obs_name:  # base_lin_vel / base_lin_vel:base (base frame)
+        elif "base_lin_vel" in obs_name or "base_lin_acc" in obs_name:  # base_lin_vel / base_lin_vel:base (base frame)
             obs_reps[obs_name] = rep_Rd
-        elif 'base_lin_acc' in obs_name:  # base_lin_acc / base_lin_acc:base (base frame)
-            obs_reps[obs_name] = rep_Rd
-        elif 'base_ang_vel' in obs_name:
+        elif "base_ang_vel" in obs_name:
             obs_reps[obs_name] = rep_Rd_pseudo
-        elif 'base_ori_euler_xyz' in obs_name:
+        elif "base_ori_euler_xyz" in obs_name:
             obs_reps[obs_name] = rep_euler_xyz
-        elif obs_name == 'base_ori_quat_wxyz':
+        elif obs_name == "base_ori_quat_wxyz":
             continue  # Quaternion does not have a left-group action definition.
-        elif obs_name == 'base_ori_SO3':
+        elif obs_name == "base_ori_SO3":
             obs_reps[obs_name] = rep_SO3_flat
-        elif 'feet_pos' in obs_name:  # feet_pos:frame := feet_pos:world or feet_pos:base
+        elif "feet_pos" in obs_name or "feet_vel" in obs_name:  # feet_pos:frame := feet_pos:world or feet_pos:base
             obs_reps[obs_name] = rep_Rd_on_limbs
-        elif 'feet_vel' in obs_name:  # feet_vel:frame := feet_vel:world or feet_vel:base
-            obs_reps[obs_name] = rep_Rd_on_limbs
-        elif obs_name == 'contact_state':
+        elif obs_name == "contact_state":
             obs_reps[obs_name] = rep_kin_three
-        elif 'contact_forces' in obs_name:
+        elif "contact_forces" in obs_name:
             obs_reps[obs_name] = rep_Rd_on_limbs
-        elif 'gravity_vector' in obs_name:
+        elif "gravity_vector" in obs_name:
             obs_reps[obs_name] = rep_Rd
         else:
             from gym_quadruped.quadruped_env import QuadrupedEnv
+
             raise ValueError(f"Invalid observation name: {obs_name}, available obs: {QuadrupedEnv.ALL_OBS}")
 
     return obs_reps

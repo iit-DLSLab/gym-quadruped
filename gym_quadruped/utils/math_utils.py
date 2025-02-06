@@ -6,9 +6,7 @@ from scipy.spatial.transform import Rotation
 
 def skew(x):
     """Skew symmetric matrix from a 3D vector."""
-    return np.array([[0, -x[2], x[1]],
-                     [x[2], 0, -x[0]],
-                     [-x[1], x[0], 0]])
+    return np.array([[0, -x[2], x[1]], [x[2], 0, -x[0]], [-x[1], x[0], 0]])
 
 
 def homogenous_transform(vec: np.ndarray, X: np.ndarray) -> np.ndarray:
@@ -36,15 +34,14 @@ def hom2pos_quatwxyz(X: np.ndarray):
     quat_xyzw = Rotation.from_matrix(X[:3, :3]).as_quat()
 
 
-
 def angle_between_vectors(vector1: np.ndarray, vector2: np.ndarray) -> float:
     """
-        Calculate the angle between two vectors
-        Args:
-            vector1 (tuple): vector 1
-            vector2 (tuple): vector 2
-        Returns:
-            Angle in radians
+    Calculate the angle between two vectors
+    Args:
+        vector1 (tuple): vector 1
+        vector2 (tuple): vector 2
+    Returns:
+        Angle in radians
     """
     """dot_product = np.dot(vector1, vector2)
     magnitude_vector1 = np.linalg.norm(vector1)

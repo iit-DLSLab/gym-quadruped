@@ -4,31 +4,50 @@ import copy
 import itertools
 import os
 from pathlib import Path
-from typing import Any, Union, Callable
+from typing import Any, Callable, Union
 
 import gymnasium as gym
 import mujoco
 import mujoco.viewer
 import numpy as np
-import math
 from gymnasium import spaces
 from mujoco import MjData, MjModel
 from scipy.spatial.transform import Rotation
-
-from gym_quadruped.utils.math_utils import homogenous_transform, angle_between_vectors
-from gym_quadruped.utils.mujoco.visual import change_robot_appearance, render_ghost_robot, render_vector
-from gym_quadruped.utils.quadruped_utils import (LegsAttr, configure_observation_space_representations,
-                                                 configure_observation_space, extract_mj_joint_info)
-
-from gym_quadruped.utils.mujoco.terrain import add_world_of_boxes, add_world_of_pyramid
 from typing_extensions import deprecated
 
-BASE_OBS = ['base_pos', 'base_lin_vel', 'base_lin_vel_err', 'base_lin_acc', 'base_ang_vel', 'base_ang_vel_err',
-            'base_ori_euler_xyz', 'base_ori_quat_wxyz', 'base_ori_SO3', 'gravity_vector']
-BASE_OBS_BASE_FRAME = ['base_lin_vel:base', 'base_lin_vel_err:base', 'base_lin_acc:base', 'base_ang_vel:base']
-GEN_COORDS_OBS = ['qpos', 'qvel', 'tau_ctrl_setpoint', 'qpos_js', 'qvel_js']
-FEET_OBS = ['feet_pos', 'feet_pos:base', 'feet_vel', 'feet_vel:base', 'contact_state', 'contact_forces',
-            'contact_forces:base']
+from gym_quadruped.utils.math_utils import angle_between_vectors, homogenous_transform
+from gym_quadruped.utils.mujoco.terrain import add_world_of_boxes, add_world_of_pyramid
+from gym_quadruped.utils.mujoco.visual import change_robot_appearance, render_ghost_robot, render_vector
+from gym_quadruped.utils.quadruped_utils import (
+    LegsAttr,
+    configure_observation_space,
+    configure_observation_space_representations,
+    extract_mj_joint_info,
+)
+
+BASE_OBS = [
+    "base_pos",
+    "base_lin_vel",
+    "base_lin_vel_err",
+    "base_lin_acc",
+    "base_ang_vel",
+    "base_ang_vel_err",
+    "base_ori_euler_xyz",
+    "base_ori_quat_wxyz",
+    "base_ori_SO3",
+    "gravity_vector",
+]
+BASE_OBS_BASE_FRAME = ["base_lin_vel:base", "base_lin_vel_err:base", "base_lin_acc:base", "base_ang_vel:base"]
+GEN_COORDS_OBS = ["qpos", "qvel", "tau_ctrl_setpoint", "qpos_js", "qvel_js"]
+FEET_OBS = [
+    "feet_pos",
+    "feet_pos:base",
+    "feet_vel",
+    "feet_vel:base",
+    "contact_state",
+    "contact_forces",
+    "contact_forces:base",
+]
 
 VelCallable = Callable[[float], np.ndarray]  # time[s] -> vec velocity [m/s] (3,)
 
@@ -42,25 +61,26 @@ class QuadrupedEnv(gym.Env):
     Rear-Left legs, respectively.
     """
 
-    _DEFAULT_OBS = ('qpos', 'qvel', 'tau_ctrl_setpoint', 'feet_pos_base', 'feet_vel_base')
+    _DEFAULT_OBS = ("qpos", "qvel", "tau_ctrl_setpoint", "feet_pos:base", "feet_vel:base")
     ALL_OBS = BASE_OBS + BASE_OBS_BASE_FRAME + GEN_COORDS_OBS + FEET_OBS
 
-    metadata = {'render.modes': ['human'], 'version': 0}
+    metadata = {"render.modes": ["human"], "version": 0}
 
-    def __init__(self,
-                 robot: str,
-                 hip_height: float,
-                 legs_joint_names: dict,
-                 state_obs_names: tuple[str, ...] = _DEFAULT_OBS,
-                 scene: str = 'flat',
-                 sim_dt: float = 0.002,
-                 base_vel_command_type: str = 'forward',
-                 ref_base_lin_vel: Union[tuple[float, float], float, VelCallable] = 0.5,  # [m/s]
-                 ref_base_ang_vel: Union[tuple[float, float], float, VelCallable] = 0.0,  # [rad/s]
-                 ground_friction_coeff: Union[tuple[float, float], float] = 1.0,
-                 legs_order: tuple[str, str, str, str] = ('FL', 'FR', 'RL', 'RR'),
-                 feet_geom_name: dict = None,
-                 ):
+    def __init__(
+        self,
+        robot: str,
+        hip_height: float,
+        legs_joint_names: dict,
+        state_obs_names: tuple[str, ...] = _DEFAULT_OBS,
+        scene: str = "flat",
+        sim_dt: float = 0.002,
+        base_vel_command_type: str = "forward",
+        ref_base_lin_vel: Union[tuple[float, float], float, VelCallable] = 0.5,  # [m/s]
+        ref_base_ang_vel: Union[tuple[float, float], float, VelCallable] = 0.0,  # [rad/s]
+        ground_friction_coeff: Union[tuple[float, float], float] = 1.0,
+        legs_order: tuple[str, str, str, str] = ("FL", "FR", "RL", "RR"),
+        feet_geom_name: dict = None,
+    ):
         """Initialize the quadruped environment.
 
         Args:
@@ -99,48 +119,53 @@ class QuadrupedEnv(gym.Env):
         self.hip_height = hip_height
 
         self.base_vel_command_type = base_vel_command_type
-        self.base_lin_vel_range = ref_base_lin_vel if isinstance(ref_base_lin_vel, tuple) else (ref_base_lin_vel,
-                                                                                                ref_base_lin_vel)
-        self.base_ang_vel_range = ref_base_ang_vel if isinstance(ref_base_ang_vel, tuple) else (ref_base_ang_vel,
-                                                                                                ref_base_ang_vel)
-        self.ground_friction_coeff_range = ground_friction_coeff if isinstance(ground_friction_coeff, tuple) else (
-            ground_friction_coeff, ground_friction_coeff)
+        self.base_lin_vel_range = (
+            ref_base_lin_vel if isinstance(ref_base_lin_vel, tuple) else (ref_base_lin_vel, ref_base_lin_vel)
+        )
+        self.base_ang_vel_range = (
+            ref_base_ang_vel if isinstance(ref_base_ang_vel, tuple) else (ref_base_ang_vel, ref_base_ang_vel)
+        )
+        self.ground_friction_coeff_range = (
+            ground_friction_coeff
+            if isinstance(ground_friction_coeff, tuple)
+            else (ground_friction_coeff, ground_friction_coeff)
+        )
         self.legs_order = legs_order
 
         # Define the model and data _______________________________________________________________
         # TODO: We should create a scene with the desired terrain and load the robot model (or multiple instances of the
         #   robot models relying on robot_descriptions.py. This way of loading the XML is not ideal.
         dir_path = os.path.dirname(os.path.realpath(__file__))
-        self.base_path = Path(dir_path) / 'robot_model' / robot
-        
+        self.base_path = Path(dir_path) / "robot_model" / robot
 
-        self.reset_env_counter=0
+        self.reset_env_counter = 0
         self.scene_name = scene
         self.terrain_radius = None
         self.terrain_center = None
 
         # Random terrain generation
-        if scene == 'random_boxes' or scene == 'random_pyramids':
-            self.model_file_path = self.base_path / f'scene_flat.xml'
-            if scene == 'random_boxes':
-                scene_env, self.terrain_radius, self.terrain_center = add_world_of_boxes(self.model_file_path,
-                                                                                        init_pos=[0.6, -1.5, 0.02],
-                                                                                        euler=[0, 0, 0.0],
-                                                                                        nums=[10, 10],
-                                                                                        separation=[0.5, 0.5])
+        if scene == "random_boxes" or scene == "random_pyramids":
+            self.model_file_path = self.base_path / "scene_flat.xml"
+            if scene == "random_boxes":
+                scene_env, self.terrain_radius, self.terrain_center = add_world_of_boxes(
+                    self.model_file_path,
+                    init_pos=[0.6, -1.5, 0.02],
+                    euler=[0, 0, 0.0],
+                    nums=[10, 10],
+                    separation=[0.5, 0.5],
+                )
             else:
-                scene_env, self.terrain_radius, self.terrain_center = add_world_of_pyramid(self.model_file_path, init_pos=[3, 0, 0.02])
-            
-            self.model_file_path = self.base_path / f'scene_new.xml'
+                scene_env, self.terrain_radius, self.terrain_center = add_world_of_pyramid(
+                    self.model_file_path, init_pos=[3, 0, 0.02]
+                )
+
+            self.model_file_path = self.base_path / "scene_new.xml"
             scene_env.write(self.model_file_path)
 
         else:
-            self.model_file_path = self.base_path / f'scene_{scene}.xml'
+            self.model_file_path = self.base_path / f"scene_{scene}.xml"
             print(self.model_file_path)
             assert self.model_file_path.exists(), f"Model file not found: {self.model_file_path.absolute().resolve()}"
-
-
-
 
         # Load the robot and scene to mujoco
         try:
@@ -184,14 +209,14 @@ class QuadrupedEnv(gym.Env):
         is_act_lim = [np.inf if not lim else 1.0 for lim in self.mjModel.actuator_forcelimited]
         self.action_space = spaces.Box(
             shape=(self.mjModel.nu,),
-            low=np.asarray([tau if not lim else -np.inf for tau, lim in zip(tau_low, is_act_lim)]),
-            high=np.asarray([tau if not lim else np.inf for tau, lim in zip(tau_high, is_act_lim)]),
-            dtype=np.float32)
+            low=np.asarray([tau if not lim else -np.inf for tau, lim in zip(tau_low, is_act_lim, strict=False)]),
+            high=np.asarray([tau if not lim else np.inf for tau, lim in zip(tau_high, is_act_lim, strict=False)]),
+            dtype=np.float32,
+        )
 
         # Observation space: __________________________________________________________________________________________
         # Get the Env observation gym.Space, and a dict with the indices of each observation in the state vector
-        self.observation_space = configure_observation_space(mj_model=self.mjModel,
-                                                             obs_names=state_obs_names)
+        self.observation_space = configure_observation_space(mj_model=self.mjModel, obs_names=state_obs_names)
         self.state_obs_names = state_obs_names
 
         self.viewer = None
@@ -229,7 +254,7 @@ class QuadrupedEnv(gym.Env):
         # Check if done (simplified, usually more complex)
         invalid_contact, contact_info = self._check_for_invalid_contacts()
         out_of_terrain_bounds = self._check_for_robot_out_of_terrain_bounds()
-        is_terminated = invalid_contact or out_of_terrain_bounds # and ...
+        is_terminated = invalid_contact or out_of_terrain_bounds  # and ...
         is_truncated = False
         # Info dictionary
         info = dict(time=self.mjData.time, step_num=self.step_num, invalid_contacts=contact_info)
@@ -237,12 +262,14 @@ class QuadrupedEnv(gym.Env):
         self.step_num += 1
         return obs, reward, is_terminated, is_truncated, info
 
-    def reset(self,
-              qpos: np.ndarray = None,
-              qvel: np.ndarray = None,
-              seed: int | None = None,
-              random: bool = True,
-              options: dict[str, Any] | None = None) -> np.ndarray:
+    def reset(
+        self,
+        qpos: np.ndarray = None,
+        qvel: np.ndarray = None,
+        seed: int | None = None,
+        random: bool = True,
+        options: dict[str, Any] | None = None,
+    ) -> np.ndarray:
         """Reset the environment.
 
         Args:
@@ -264,24 +291,24 @@ class QuadrupedEnv(gym.Env):
         self.mjData.qfrc_applied = 0.0
         options = {} if options is None else options
 
-        if seed is not None: np.random.seed(seed)  # Set seed for reproducibility
+        if seed is not None:
+            np.random.seed(seed)  # Set seed for reproducibility
 
         # Reset the robot state ----------------------------------------------------------------------------------------
         if qpos is None and qvel is None:  # Random initialization around xml keyframe 0
             mujoco.mj_resetDataKeyframe(self.mjModel, self.mjData, 0)
-            
+
             # Add white noise to the joint-space position and velocity
             if random:
-                q_pos_amp = 20 * np.pi / 180 if 'angle_sweep' not in options else options['angle_sweep']
+                q_pos_amp = 20 * np.pi / 180 if "angle_sweep" not in options else options["angle_sweep"]
                 q_vel_amp = 0.5
                 self.mjData.qpos[7:] += np.random.uniform(-q_pos_amp, q_pos_amp, self.mjModel.nq - 7)
                 self.mjData.qvel[6:] += np.random.uniform(-q_vel_amp, q_vel_amp, self.mjModel.nv - 6)
-                
-                
-                if(self.scene_name=="random_boxes" or self.scene_name=="random_pyramids"):
+
+                if self.scene_name == "random_boxes" or self.scene_name == "random_pyramids":
                     # Random xy position within a circle of the random generated terrain
                     # Orientation pointing toward the center of the terrain
-                    cx,cy = self.terrain_center
+                    cx, cy = self.terrain_center
 
                     # Generate a random angle (in radians)
                     angle = np.random.uniform(0, 2 * np.pi)
@@ -293,35 +320,38 @@ class QuadrupedEnv(gym.Env):
                     # Create the vector pointing to the center (cx, cy) from (x_border, y_border)
                     vector_world_to_border = np.array([x_border, y_border, 0])
                     vector_world_to_center = np.array([cx, cy, 0])
-                    
+
                     theta = angle_between_vectors(vector_world_to_border, vector_world_to_center)
-                    
-                    ori_xyzw = Rotation.from_euler('xyz', [0, 0, theta]).as_quat(canonical=True)
-                    
-                    self.mjData.qpos[0:2] = np.array([x_border, y_border], dtype=np.float32)   
+
+                    ori_xyzw = Rotation.from_euler("xyz", [0, 0, theta]).as_quat(canonical=True)
+
+                    self.mjData.qpos[0:2] = np.array([x_border, y_border], dtype=np.float32)
                 else:
                     # Random orientation
-                    roll_sweep = 10 * np.pi / 180 if 'roll_sweep' not in options else options['roll_sweep']
-                    pitch_sweep = 10 * np.pi / 180 if 'pitch_sweep' not in options else options['pitch_sweep']
-                    ori_xyzw = Rotation.from_euler('xyz',
-                                                [np.random.uniform(-roll_sweep, roll_sweep),
-                                                    np.random.uniform(-pitch_sweep, pitch_sweep),
-                                                    np.random.uniform(-np.pi, np.pi)]).as_quat(canonical=True)
+                    roll_sweep = 10 * np.pi / 180 if "roll_sweep" not in options else options["roll_sweep"]
+                    pitch_sweep = 10 * np.pi / 180 if "pitch_sweep" not in options else options["pitch_sweep"]
+                    ori_xyzw = Rotation.from_euler(
+                        "xyz",
+                        [
+                            np.random.uniform(-roll_sweep, roll_sweep),
+                            np.random.uniform(-pitch_sweep, pitch_sweep),
+                            np.random.uniform(-np.pi, np.pi),
+                        ],
+                    ).as_quat(canonical=True)
                     # Random xy position withing a 2 x 2 square
-                    self.mjData.qpos[0:2] = np.random.uniform(-2, 2, 2)                 
-                    
+                    self.mjData.qpos[0:2] = np.random.uniform(-2, 2, 2)
 
                 ori_wxyz = np.roll(ori_xyzw, 1)
                 self.mjData.qpos[3:7] = ori_wxyz
 
-
                 try:
-                    feet_pos = self.feet_pos(frame='world')
+                    feet_pos = self.feet_pos(frame="world")
                     max_z = np.max([pos[2] for pos in feet_pos.to_list()])
                     self.mjData.qpos[2] -= max_z
-                except ValueError as e:
-                    self.mjData.qpos[2] = self.hip_height + np.random.uniform(-0.05 * self.hip_height,
-                                                                              0.05 * self.hip_height)
+                except ValueError:
+                    self.mjData.qpos[2] = self.hip_height + np.random.uniform(
+                        -0.05 * self.hip_height, 0.05 * self.hip_height
+                    )
 
             # Perform a forward dynamics computation to update the contact information
             mujoco.mj_step1(self.mjModel, self.mjData)
@@ -345,21 +375,21 @@ class QuadrupedEnv(gym.Env):
 
         # Reset the desired base velocity command
         # ----------------------------------------------------------------------
-        if 'forward' in self.base_vel_command_type:
+        if "forward" in self.base_vel_command_type:
             base_vel_norm = np.random.uniform(*self.base_lin_vel_range)
             base_heading_vel_vec = np.array([1, 0, 0])  # Move in the "forward" direction
-        elif 'random' in self.base_vel_command_type:
+        elif "random" in self.base_vel_command_type:
             base_vel_norm = np.random.uniform(*self.base_lin_vel_range)
             heading_angle = np.random.uniform(-np.pi, np.pi)
             base_heading_vel_vec = np.array([np.cos(heading_angle), np.sin(heading_angle), 0])
-        elif 'human' in self.base_vel_command_type:
+        elif "human" in self.base_vel_command_type:
             base_vel_norm = 0.0
             base_heading_vel_vec = np.array([1, 0, 0])
             self._ref_base_ang_yaw_dot = 0.0
         else:
             raise ValueError(f"Invalid base linear velocity command type: {self.base_vel_command_type}")
 
-        if 'rotate' in self.base_vel_command_type:
+        if "rotate" in self.base_vel_command_type:
             self._ref_base_ang_yaw_dot = np.random.uniform(*self.base_ang_vel_range)
         else:
             self._ref_base_ang_yaw_dot = 0.0
@@ -369,8 +399,6 @@ class QuadrupedEnv(gym.Env):
         # Ground friction coefficient randomization if enabled.
         tangential_friction = np.random.uniform(*self.ground_friction_coeff_range)
         self._set_ground_friction(tangential_coeff=tangential_friction)
-
-
 
         """# reset World----------------------------------------------
         if(os.path.exists(self.model_file_path) and 
@@ -399,18 +427,13 @@ class QuadrupedEnv(gym.Env):
                 self.render()
             except ValueError as e:
                 raise ValueError(f"Error loading the scene {self.model_file_path}:") from e
-        #-------------------------------------------------------------- """   
+        #-------------------------------------------------------------- """
 
-            
-            
-
-        self.reset_env_counter+=1
+        self.reset_env_counter += 1
         return self._get_obs()
-    
 
-
-    def render(self, mode='human', tint_robot=False, ghost_qpos=None, ghost_alpha=0.5):
-        """ Render the environment.
+    def render(self, mode="human", tint_robot=False, ghost_qpos=None, ghost_alpha=0.5):
+        """Render the environment.
 
         Args:
             mode: (str) The rendering mode. Only 'human' is supported. TODO: rgb frame.
@@ -420,12 +443,16 @@ class QuadrupedEnv(gym.Env):
         Returns:
 
         """
-        if self.viewer is None and mode == 'human':
+        if self.viewer is None and mode == "human":
             self.viewer = mujoco.viewer.launch_passive(
-                self.mjModel, self.mjData, show_left_ui=False, show_right_ui=False,
-                key_callback=lambda x: self._key_callback(x)
-                )
-            if tint_robot: change_robot_appearance(self.mjModel, alpha=1.0)
+                self.mjModel,
+                self.mjData,
+                show_left_ui=False,
+                show_right_ui=False,
+                key_callback=lambda x: self._key_callback(x),
+            )
+            if tint_robot:
+                change_robot_appearance(self.mjModel, alpha=1.0)
 
             mujoco.mjv_defaultFreeCamera(self.mjModel, self.viewer.cam)
             self.viewer.user_scn.flags[mujoco.mjtRndFlag.mjRND_SHADOW] = 0
@@ -437,18 +464,21 @@ class QuadrupedEnv(gym.Env):
         base_lin_vel = self.mjData.qvel[0:3]
         ref_base_lin_vel_B, _ = self.target_base_vel()
         ref_vec_pos, vec_pos = base_pos + [0, 0, 0.1], base_pos + [0, 0, 0.15]
-        ref_vel_vec_color, vel_vec_color = np.array([1, 0.5, 0, .7]), np.array([0, 1, 1, .7])
+        ref_vel_vec_color, vel_vec_color = np.array([1, 0.5, 0, 0.7]), np.array([0, 1, 1, 0.7])
         ref_vec_scale, vec_scale = np.linalg.norm(ref_base_lin_vel_B) / 1.0, np.linalg.norm(base_lin_vel) / 1.0
 
-        ref_vec_id, vec_id = self._geom_ids.get('ref_dr_B_vec', -1), self._geom_ids.get('dr_B_vec', -1)
-        self._geom_ids['ref_dr_B_vec'] = render_vector(
-            self.viewer, ref_base_lin_vel_B, pos=ref_vec_pos, scale=ref_vec_scale, color=ref_vel_vec_color,
-            geom_id=ref_vec_id
-            )
-        self._geom_ids['dr_B_vec'] = render_vector(
-            self.viewer, base_lin_vel, pos=vec_pos, scale=vec_scale, color=vel_vec_color,
-            geom_id=vec_id
-            )
+        ref_vec_id, vec_id = self._geom_ids.get("ref_dr_B_vec", -1), self._geom_ids.get("dr_B_vec", -1)
+        self._geom_ids["ref_dr_B_vec"] = render_vector(
+            self.viewer,
+            ref_base_lin_vel_B,
+            pos=ref_vec_pos,
+            scale=ref_vec_scale,
+            color=ref_vel_vec_color,
+            geom_id=ref_vec_id,
+        )
+        self._geom_ids["dr_B_vec"] = render_vector(
+            self.viewer, base_lin_vel, pos=vec_pos, scale=vec_scale, color=vel_vec_color, geom_id=vec_id
+        )
 
         # Ghost robot rendering _______________________________________________________________________________________
         if ghost_qpos is not None:
@@ -461,54 +491,54 @@ class QuadrupedEnv(gym.Env):
         # Finally, sync the viewer with the data. # TODO: if render mode is rgb, return the frame.
         self.viewer.sync()
 
-    def target_base_vel(self, frame='world') -> tuple[np.ndarray, np.ndarray]:
+    def target_base_vel(self, frame="world") -> tuple[np.ndarray, np.ndarray]:
         """Returns the target base linear (3,) and angular (3,) velocity in the world reference frame."""
         if self._ref_base_lin_vel_H is None:
             raise RuntimeError("Please call env.reset() before accessing the target base velocity.")
         R_B_heading = self.heading_orientation_SO3
         ref_base_lin_vel = (R_B_heading @ self._ref_base_lin_vel_H.reshape(3, 1)).squeeze()
-        ref_base_ang_vel = np.array([0., 0., self._ref_base_ang_yaw_dot])
-        if frame == 'world':
+        ref_base_ang_vel = np.array([0.0, 0.0, self._ref_base_ang_yaw_dot])
+        if frame == "world":
             return ref_base_lin_vel, ref_base_ang_vel
-        elif frame == 'base':
+        elif frame == "base":
             R = self.base_configuration[0:3, 0:3]
             return R.T @ ref_base_lin_vel, R.T @ ref_base_ang_vel
 
-    def base_lin_vel(self, frame='world'):
+    def base_lin_vel(self, frame="world"):
         """Returns the base linear velocity (3,) in the specified frame."""
-        if frame == 'world':
+        if frame == "world":
             return self.mjData.qvel[0:3]
-        elif frame == 'base':
+        elif frame == "base":
             R = self.base_configuration[0:3, 0:3]
             return R.T @ self.mjData.qvel[0:3]
         else:
             raise ValueError(f"Invalid frame: {frame} != 'world' or 'base'")
 
-    def base_lin_vel_err(self, frame='world'):
+    def base_lin_vel_err(self, frame="world"):
         ref_lin_vel_err, _ = self.target_base_vel(frame)
         base_lin_vel = self.base_lin_vel(frame)
         return ref_lin_vel_err - base_lin_vel
 
-    def base_ang_vel_err(self, frame='world'):
+    def base_ang_vel_err(self, frame="world"):
         _, ref_ang_vel_err = self.target_base_vel(frame)
         base_ang_vel = self.base_ang_vel(frame)
         return ref_ang_vel_err - base_ang_vel
 
-    def base_ang_vel(self, frame='world'):
+    def base_ang_vel(self, frame="world"):
         """Returns the base angular velocity (3,) in the specified frame."""
-        if frame == 'world':
+        if frame == "world":
             return self.mjData.qvel[3:6]
-        elif frame == 'base':
+        elif frame == "base":
             R = self.base_configuration[0:3, 0:3]
             return R.T @ self.mjData.qvel[3:6]
         else:
             raise ValueError(f"Invalid frame: {frame} != 'world' or 'base'")
 
-    def base_lin_acc(self, frame='world'):
+    def base_lin_acc(self, frame="world"):
         """Returns the base linear acceleration (3,) [m/s^2] in the specified frame."""
-        if frame == 'world':
+        if frame == "world":
             return self.mjData.qacc[0:3]
-        elif frame == 'base':
+        elif frame == "base":
             R = self.base_configuration[0:3, 0:3]
             return R.T @ self.mjData.qacc[0:3]
         else:
@@ -535,7 +565,7 @@ class QuadrupedEnv(gym.Env):
 
         return inertia_B_at_qpos
 
-    def hip_positions(self, frame='world') -> LegsAttr:
+    def hip_positions(self, frame="world") -> LegsAttr:
         """Get the hip positions in the specified frame.
 
         Args:
@@ -550,25 +580,25 @@ class QuadrupedEnv(gym.Env):
                 - RL: (3,) position of the RL hip in the specified frame.
                 - RR: (3,) position of the RR hip in the specified frame.
         """
-        if frame == 'world':
+        if frame == "world":
             R = np.eye(3)
-        elif frame == 'base':
+        elif frame == "base":
             R = self.base_configuration[0:3, 0:3]
         else:
             raise ValueError(f"Invalid frame: {frame} != 'world' or 'base'")
         # TODO: Name of bodies should not be hardcodd
-        FL_hip_id = mujoco.mj_name2id(self.mjModel, mujoco.mjtObj.mjOBJ_BODY, 'FL_hip')
-        FR_hip_id = mujoco.mj_name2id(self.mjModel, mujoco.mjtObj.mjOBJ_BODY, 'FR_hip')
-        RL_hip_id = mujoco.mj_name2id(self.mjModel, mujoco.mjtObj.mjOBJ_BODY, 'RL_hip')
-        RR_hip_id = mujoco.mj_name2id(self.mjModel, mujoco.mjtObj.mjOBJ_BODY, 'RR_hip')
+        FL_hip_id = mujoco.mj_name2id(self.mjModel, mujoco.mjtObj.mjOBJ_BODY, "FL_hip")
+        FR_hip_id = mujoco.mj_name2id(self.mjModel, mujoco.mjtObj.mjOBJ_BODY, "FR_hip")
+        RL_hip_id = mujoco.mj_name2id(self.mjModel, mujoco.mjtObj.mjOBJ_BODY, "RL_hip")
+        RR_hip_id = mujoco.mj_name2id(self.mjModel, mujoco.mjtObj.mjOBJ_BODY, "RR_hip")
         return LegsAttr(
             FR=R.T @ self.mjData.body(FR_hip_id).xpos,
             FL=R.T @ self.mjData.body(FL_hip_id).xpos,
             RR=R.T @ self.mjData.body(RR_hip_id).xpos,
             RL=R.T @ self.mjData.body(RL_hip_id).xpos,
-            )
+        )
 
-    def feet_pos(self, frame='world') -> LegsAttr:
+    def feet_pos(self, frame="world") -> LegsAttr:
         """Get the feet positions in the specified frame.
 
         Args:
@@ -586,11 +616,11 @@ class QuadrupedEnv(gym.Env):
         if any(x is None for x in self._feet_geom_id.to_list()):
             raise ValueError(
                 "Please provide the `feet_geom_name` argument in the Env constructor to compute feet positions."
-                )
+            )
 
-        if frame == 'world':
+        if frame == "world":
             X = np.eye(4)
-        elif frame == 'base':
+        elif frame == "base":
             X = np.linalg.inv(self.base_configuration)  # X_W2B : World to Base
         else:
             raise ValueError(f"Invalid frame: {frame} != 'world' or 'base'")
@@ -600,9 +630,9 @@ class QuadrupedEnv(gym.Env):
             FL=homogenous_transform(self.mjData.geom_xpos[self._feet_geom_id.FL], X),
             RR=homogenous_transform(self.mjData.geom_xpos[self._feet_geom_id.RR], X),
             RL=homogenous_transform(self.mjData.geom_xpos[self._feet_geom_id.RL], X),
-            )
+        )
 
-    def feet_vel(self, frame='world') -> LegsAttr:
+    def feet_vel(self, frame="world") -> LegsAttr:
         """Get the feet velocities in the specified frame.
 
         The feet velocities are computed using the Jacobians of the feet positions and the joint velocities.
@@ -622,7 +652,7 @@ class QuadrupedEnv(gym.Env):
         feet_jac = self.feet_jacobians(frame=frame)
         return LegsAttr(**{leg_name: feet_jac[leg_name] @ self.mjData.qvel for leg_name in self.legs_order})
 
-    def feet_jacobians(self, frame: str = 'world', return_rot_jac: bool = False) -> LegsAttr | tuple[LegsAttr, ...]:
+    def feet_jacobians(self, frame: str = "world", return_rot_jac: bool = False) -> LegsAttr | tuple[LegsAttr, ...]:
         """Compute the Jacobians of the feet positions.
 
         This function computes the translational and rotational Jacobians of the feet positions. Each feet position is
@@ -656,33 +686,34 @@ class QuadrupedEnv(gym.Env):
         if any(x is None for x in self._feet_body_id.to_list()):
             raise ValueError(
                 "Please provide the `feet_geom_name` argument in the Env constructor to compute feet Jacobians."
-                )
+            )
 
-        if frame == 'world':
+        if frame == "world":
             R = np.eye(3)
-        elif frame == 'base':
+        elif frame == "base":
             R = self.base_configuration[0:3, 0:3]
         else:
             raise ValueError(f"Invalid frame: {frame} != 'world' or 'base'")
         feet_trans_jac = LegsAttr(*[np.zeros((3, self.mjModel.nv)) for _ in range(4)])
         feet_rot_jac = LegsAttr(*[np.zeros((3, self.mjModel.nv)) if not return_rot_jac else None for _ in range(4)])
-        feet_pos = self.feet_pos(frame='world')  # Mujoco mj_jac expects the point in global coordinates.
+        feet_pos = self.feet_pos(frame="world")  # Mujoco mj_jac expects the point in global coordinates.
 
         for leg_name in ["FR", "FL", "RR", "RL"]:
-            mujoco.mj_jac(m=self.mjModel,
-                          d=self.mjData,
-                          jacp=feet_trans_jac[leg_name],
-                          jacr=feet_rot_jac[leg_name],
-                          point=feet_pos[leg_name],  # Point in global coordinates
-                          body=self._feet_body_id[leg_name]  # Body to which `point` is attached to.
-                          )
+            mujoco.mj_jac(
+                m=self.mjModel,
+                d=self.mjData,
+                jacp=feet_trans_jac[leg_name],
+                jacr=feet_rot_jac[leg_name],
+                point=feet_pos[leg_name],  # Point in global coordinates
+                body=self._feet_body_id[leg_name],  # Body to which `point` is attached to.
+            )
             feet_trans_jac[leg_name] = R.T @ feet_trans_jac[leg_name]
             if return_rot_jac:
                 feet_rot_jac[leg_name] = R.T @ feet_rot_jac[leg_name]
 
         return feet_trans_jac if not return_rot_jac else (feet_trans_jac, feet_rot_jac)
 
-    def feet_contact_state(self, frame='world', ground_reaction_forces=False) -> [LegsAttr, LegsAttr]:
+    def feet_contact_state(self, frame="world", ground_reaction_forces=False) -> [LegsAttr, LegsAttr]:
         """Returns the boolean contact state of the feet.
 
         This function considers only contacts between the feet and the ground.
@@ -715,7 +746,7 @@ class QuadrupedEnv(gym.Env):
         if any(x is None for x in self._feet_body_id.to_list()):
             raise ValueError(
                 "Please provide the `feet_geom_name` argument in the Env constructor to compute contact forces."
-                )
+            )
 
         contact_state = LegsAttr(FL=False, FR=False, RL=False, RR=False)
         feet_contacts = LegsAttr(FL=[], FR=[], RL=[], RR=[])
@@ -742,9 +773,9 @@ class QuadrupedEnv(gym.Env):
                                 feet_contact_forces[leg_name].append(force_w)
 
         if ground_reaction_forces:
-            if frame == 'world':
+            if frame == "world":
                 R = np.eye(3)
-            elif frame == 'base':
+            elif frame == "base":
                 R = self.base_configuration[0:3, 0:3]
             else:
                 raise ValueError(f"Invalid frame: {frame} != 'world' or 'base'")
@@ -765,23 +796,31 @@ class QuadrupedEnv(gym.Env):
             self.viewer = None
 
     @property
-    def legs_mass_matrix(self, ):
+    def legs_mass_matrix(
+        self,
+    ):
         mass_matrix = np.zeros((self.mjModel.nv, self.mjModel.nv))
         mujoco.mj_fullM(self.mjModel, mass_matrix, self.mjData.qM)
         # Get the mass matrix of the legs
-        legs_mass_matrix = LegsAttr(FL=mass_matrix[np.ix_(self.legs_qvel_idx.FL, self.legs_qvel_idx.FL)],
-                                    FR=mass_matrix[np.ix_(self.legs_qvel_idx.FR, self.legs_qvel_idx.FR)],
-                                    RL=mass_matrix[np.ix_(self.legs_qvel_idx.RL, self.legs_qvel_idx.RL)],
-                                    RR=mass_matrix[np.ix_(self.legs_qvel_idx.RR, self.legs_qvel_idx.RR)])
+        legs_mass_matrix = LegsAttr(
+            FL=mass_matrix[np.ix_(self.legs_qvel_idx.FL, self.legs_qvel_idx.FL)],
+            FR=mass_matrix[np.ix_(self.legs_qvel_idx.FR, self.legs_qvel_idx.FR)],
+            RL=mass_matrix[np.ix_(self.legs_qvel_idx.RL, self.legs_qvel_idx.RL)],
+            RR=mass_matrix[np.ix_(self.legs_qvel_idx.RR, self.legs_qvel_idx.RR)],
+        )
         return legs_mass_matrix
 
     @property
-    def legs_qfrc_bias(self, ):
+    def legs_qfrc_bias(
+        self,
+    ):
         # centrifugal, coriolis, gravity
-        legs_qfrc_bias = LegsAttr(FL=self.mjData.qfrc_bias[self.legs_qvel_idx.FL],
-                                  FR=self.mjData.qfrc_bias[self.legs_qvel_idx.FR],
-                                  RL=self.mjData.qfrc_bias[self.legs_qvel_idx.RL],
-                                  RR=self.mjData.qfrc_bias[self.legs_qvel_idx.RR])
+        legs_qfrc_bias = LegsAttr(
+            FL=self.mjData.qfrc_bias[self.legs_qvel_idx.FL],
+            FR=self.mjData.qfrc_bias[self.legs_qvel_idx.FR],
+            RL=self.mjData.qfrc_bias[self.legs_qvel_idx.RL],
+            RR=self.mjData.qfrc_bias[self.legs_qvel_idx.RR],
+        )
         return legs_qfrc_bias
 
     @property
@@ -823,16 +862,16 @@ class QuadrupedEnv(gym.Env):
         """Returns the base orientation in Euler XYZ angles (roll, pitch, yaw) in the world reference frame."""
         quat_wxyz = self.mjData.qpos[3:7]
         quat_xyzw = np.roll(quat_wxyz, -1)
-        return Rotation.from_quat(quat_xyzw).as_euler('xyz')
+        return Rotation.from_quat(quat_xyzw).as_euler("xyz")
 
     @property
     def heading_orientation_SO3(self):
         """Returns a SO(3) matrix that aligns with the robot's base heading orientation and the world z axis."""
         X_B = self.base_configuration
         R_B = X_B[0:3, 0:3]
-        euler_xyz = Rotation.from_matrix(R_B).as_euler('xyz')
+        euler_xyz = Rotation.from_matrix(R_B).as_euler("xyz")
         # Rotation aligned with the base orientation and the vertical axis
-        R_B_horizontal = Rotation.from_euler('xyz', euler_xyz * [0, 0, 1]).as_matrix()
+        R_B_horizontal = Rotation.from_euler("xyz", euler_xyz * [0, 0, 1]).as_matrix()
         return R_B_horizontal
 
     @property
@@ -845,7 +884,7 @@ class QuadrupedEnv(gym.Env):
 
     @property
     def gravity_vector(self):
-        """ Returns the world-z axis unitary vector in base frame. This is an observable orientation """
+        """Returns the world-z axis unitary vector in base frame. This is an observable orientation"""
         return self.base_configuration[0:3, 2]
 
     @property
@@ -870,9 +909,10 @@ class QuadrupedEnv(gym.Env):
 
     @property
     def obs_group_reps(self):
-        """ Returns the group representations of each observable in the observation space"""
-        obs_reps = configure_observation_space_representations(robot_name=self.robot_name,
-                                                               obs_names=self.state_obs_names)
+        """Returns the group representations of each observable in the observation space"""
+        obs_reps = configure_observation_space_representations(
+            robot_name=self.robot_name, obs_names=self.state_obs_names
+        )
         return obs_reps
 
     @deprecated("state observation is already a gym.spaces.Dict instance since version 0.0.8")
@@ -902,58 +942,59 @@ class QuadrupedEnv(gym.Env):
         state_obs_dict = {}
         remaining_obs = set(self.observation_space.keys())
         for obs_name in self.state_obs_names:
-            frame = 'world' if not obs_name.endswith('base') else 'base'
+            frame = "world" if not obs_name.endswith("base") else "base"
             obs_val = None  # Initialize observation value
 
             # Generalized position, velocity, and force (torque) spaces
-            if obs_name == 'qpos':
+            if obs_name == "qpos":
                 obs_val = self.mjData.qpos.copy()
-            elif obs_name == 'qvel':
+            elif obs_name == "qvel":
                 obs_val = self.mjData.qvel.copy()
-            elif obs_name == 'tau_ctrl_setpoint':
+            elif obs_name == "tau_ctrl_setpoint":
                 obs_val = self.torque_ctrl_setpoint.copy()
-            elif obs_name == 'qpos_js':
+            elif obs_name == "qpos_js":
                 obs_val = self.mjData.qpos[7:].copy()
-            elif obs_name == 'qvel_js':
+            elif obs_name == "qvel_js":
                 obs_val = self.mjData.qvel[6:].copy()
-            elif obs_name == 'base_pos':
+            elif obs_name == "base_pos":
                 obs_val = self.base_pos.copy()
-            elif 'base_lin_vel' in obs_name:
+            elif "base_lin_vel" in obs_name:
                 obs_val = self.base_lin_vel(frame).copy()
-            elif 'base_lin_acc' in obs_name:
+            elif "base_lin_acc" in obs_name:
                 obs_val = self.base_lin_acc(frame).copy()
-            elif 'base_ang_vel' in obs_name:
+            elif "base_ang_vel" in obs_name:
                 obs_val = self.base_ang_vel(frame).copy()
-            elif obs_name == 'base_ori_euler_xyz':
+            elif obs_name == "base_ori_euler_xyz":
                 obs_val = self.base_ori_euler_xyz.copy()
-            elif obs_name == 'base_ori_quat_wxyz':
+            elif obs_name == "base_ori_quat_wxyz":
                 obs_val = self.mjData.qpos[3:7].copy()
-            elif obs_name == 'base_ori_SO3':
+            elif obs_name == "base_ori_SO3":
                 obs_val = self.base_configuration[0:3, 0:3].flatten().copy()
-            elif 'feet_pos' in obs_name:
+            elif "feet_pos" in obs_name:
                 obs_val = np.concatenate(self.feet_pos(frame).to_list(order=self.legs_order), axis=0).copy()
-            elif 'feet_vel' in obs_name:
+            elif "feet_vel" in obs_name:
                 obs_val = np.concatenate(self.feet_vel(frame).to_list(order=self.legs_order), axis=0).copy()
-            elif obs_name == 'contact_state':
+            elif obs_name == "contact_state":
                 contact_state, _ = self.feet_contact_state()
                 obs_val = np.array(contact_state.to_list(), dtype=np.float32).copy()
-            elif 'contact_forces' in obs_name:
+            elif "contact_forces" in obs_name:
                 _, _, contact_forces = self.feet_contact_state(ground_reaction_forces=True, frame=frame)
                 obs_val = np.concatenate(contact_forces.to_list(order=self.legs_order), axis=0).copy()
-            elif 'gravity_vector' in obs_name:
+            elif "gravity_vector" in obs_name:
                 obs_val = self.gravity_vector.copy()
             else:
                 raise ValueError(f"Invalid observation name: {obs_name}, available obs: {self.ALL_OBS}")
 
-            assert self.observation_space[obs_name].shape == obs_val.shape, \
+            assert self.observation_space[obs_name].shape == obs_val.shape, (
                 f"Invalid shape for observation {obs_name}: {obs_val.shape} != {self.observation_space[obs_name].shape}"
+            )
             state_obs_dict[obs_name] = obs_val  # Assign computed observation value to the dictionary
             remaining_obs.remove(obs_name)  # Remove the observation name from the remaining observations
 
         if len(remaining_obs) > 0:
             raise RuntimeError(
                 f"The observations {remaining_obs} are in the observation space but not in the returned obsertation."
-                )
+            )
 
         return state_obs_dict
 
@@ -978,16 +1019,15 @@ class QuadrupedEnv(gym.Env):
                 pass  # Do nothing for now
 
         return invalid_contact_detected, invalid_contacts  # No invalid contact detected
-    
+
     def _check_for_robot_out_of_terrain_bounds(self) -> bool:
         """Env termination occurs when the robot is outside the environment."""
-        if(self.scene_name=="random_boxes" or self.scene_name=="random_pyramids"):
+        if self.scene_name == "random_boxes" or self.scene_name == "random_pyramids":
             distance_robot_to_center = np.linalg.norm(self.base_pos[:2] - self.terrain_center)
-            if distance_robot_to_center > self.terrain_radius*1.3:
+            if distance_robot_to_center > self.terrain_radius * 1.3:
                 return True
         else:
             return False
-
 
     def _get_geom_body_info(self, geom_name: str = None, geom_id: int = None) -> [int, str]:
         """Returns the body ID and name associated with the geometry name or ID."""
@@ -1007,25 +1047,27 @@ class QuadrupedEnv(gym.Env):
 
     # Function to update the camera position
 
-    def _set_ground_friction(self,
-                             tangential_coeff: float = 1.0,  # Default MJ tangential coefficient
-                             torsional_coeff: float = 0.005,  # Default MJ torsional coefficient
-                             rolling_coeff: float = 0.0  # Default MJ rolling coefficient
-                             ):
+    def _set_ground_friction(
+        self,
+        tangential_coeff: float = 1.0,  # Default MJ tangential coefficient
+        torsional_coeff: float = 0.005,  # Default MJ torsional coefficient
+        rolling_coeff: float = 0.0,  # Default MJ rolling coefficient
+    ):
         """Initialize ground friction coefficients using a specified distribution."""
         pass
         for geom_id in range(self.mjModel.ngeom):
             geom_name = mujoco.mj_id2name(self.mjModel, mujoco.mjtObj.mjOBJ_GEOM, geom_id)
-            if geom_name and geom_name.lower() in ['ground', 'floor', 'hfield', "terrain"]:
-                self.mjModel.geom_friction[geom_id, :] = [tangential_coeff, torsional_coeff, rolling_coeff]
-                # print(f"Setting friction for {geom_name} to: {tangential_coeff, torsional_coeff, rolling_coeff}")
-            elif geom_id in self._feet_geom_id:  # Set the same friction coefficients for the feet geometries
+            if (
+                geom_name
+                and geom_name.lower() in ["ground", "floor", "hfield", "terrain"]
+                or geom_id in self._feet_geom_id
+            ):
                 self.mjModel.geom_friction[geom_id, :] = [tangential_coeff, torsional_coeff, rolling_coeff]
             else:
                 pass
 
     def _render_ghost_robots(self, qpos: np.ndarray, alpha: float | np.ndarray = 0.5):
-        """ Render ghost robots with the provided qpos configurations.
+        """Render ghost robots with the provided qpos configurations.
 
         :param qpos: (n_robots, nq) or (nq,) array with the joint positions of the ghost robots.
         :param alpha: (float) or (n_robots,) array with the transparency of the ghost robots.
@@ -1038,7 +1080,7 @@ class QuadrupedEnv(gym.Env):
             qp = qp.reshape(1, -1)
             alpha = [alpha]
 
-        for ghost_robot_idx, (q, a) in enumerate(zip(qp, alpha)):
+        for ghost_robot_idx, (q, a) in enumerate(zip(qp, alpha, strict=False)):
             # Use forward kinematics to update the geometry positions
             if ghost_robot_idx not in self._ghost_robots_geom:
                 self._ghost_robots_geom[ghost_robot_idx] = {}
@@ -1051,8 +1093,8 @@ class QuadrupedEnv(gym.Env):
                 self.mjModel,
                 self._ghost_mjData,
                 alpha=a,
-                ghost_geoms=self._ghost_robots_geom.get(ghost_robot_idx, {})
-                )
+                ghost_geoms=self._ghost_robots_geom.get(ghost_robot_idx, {}),
+            )
 
     def _key_callback(self, keycode):
         # print(f"\n\n ********************* Key pressed: {keycode}\n\n\n")
@@ -1073,7 +1115,7 @@ class QuadrupedEnv(gym.Env):
 
     def _save_hyperparameters(self, constructor_params):
         self._init_args = constructor_params
-        [self._init_args.pop(k) for k in ['self', '__class__']]  # Remove 'self' and '__class__
+        [self._init_args.pop(k) for k in ["self", "__class__"]]  # Remove 'self' and '__class__
 
     def get_hyperparameters(self):
         return copy.copy(self._init_args)
@@ -1090,39 +1132,59 @@ class QuadrupedEnv(gym.Env):
     def __str__(self):
         """Returns a description of the environment task configuration."""
         msg = f"robot={self._init_args['robot']} terrain={self._init_args['scene']} task={self.base_vel_command_type}"
-        if self.base_vel_command_type == 'human':
+        if self.base_vel_command_type == "human":
             pass
         else:
-            msg += (f" lin_vel_range=({self.base_lin_vel_range[0]:.3f}, {self.base_lin_vel_range[1]:.3f})"
-                    f" ang_vel_range=({self.base_ang_vel_range[0]:.3f}, {self.base_ang_vel_range[1]:.3f})"
-                    f" lat_friction_range=({self.ground_friction_coeff_range[0]:.1e}, "
-                    f"{self.ground_friction_coeff_range[1]:.1e})")
+            msg += (
+                f" lin_vel_range=({self.base_lin_vel_range[0]:.3f}, {self.base_lin_vel_range[1]:.3f})"
+                f" ang_vel_range=({self.base_ang_vel_range[0]:.3f}, {self.base_ang_vel_range[1]:.3f})"
+                f" lat_friction_range=({self.ground_friction_coeff_range[0]:.1e}, "
+                f"{self.ground_friction_coeff_range[1]:.1e})"
+            )
         return msg
 
 
 # Example usage:
-if __name__ == '__main__':
-
+if __name__ == "__main__":
     robot_name = "mini_cheetah"
     scene_name = "flat"
-    robot_feet_geom_names = dict(FL='FL', FR='FR', RL='RL', RR='RR')
-    robot_leg_joints = dict(FL=['FL_hip_joint', 'FL_thigh_joint', 'FL_calf_joint', ],  # TODO: Make configs per robot.
-                            FR=['FR_hip_joint', 'FR_thigh_joint', 'FR_calf_joint', ],
-                            RL=['RL_hip_joint', 'RL_thigh_joint', 'RL_calf_joint', ],
-                            RR=['RR_hip_joint', 'RR_thigh_joint', 'RR_calf_joint', ])
+    robot_feet_geom_names = dict(FL="FL", FR="FR", RL="RL", RR="RR")
+    robot_leg_joints = dict(
+        FL=[
+            "FL_hip_joint",
+            "FL_thigh_joint",
+            "FL_calf_joint",
+        ],  # TODO: Make configs per robot.
+        FR=[
+            "FR_hip_joint",
+            "FR_thigh_joint",
+            "FR_calf_joint",
+        ],
+        RL=[
+            "RL_hip_joint",
+            "RL_thigh_joint",
+            "RL_calf_joint",
+        ],
+        RR=[
+            "RR_hip_joint",
+            "RR_thigh_joint",
+            "RR_calf_joint",
+        ],
+    )
 
     state_observables_names = tuple(QuadrupedEnv.ALL_OBS)
 
-    env = QuadrupedEnv(robot='mini_cheetah',
-                       hip_height=0.25,
-                       legs_joint_names=robot_leg_joints,  # Joint names of the legs DoF
-                       feet_geom_name=robot_feet_geom_names,  # Geom/Frame id of feet
-                       scene=scene_name,
-                       ref_base_lin_vel=(0.5, 1.0),  # pass a float for a fixed value
-                       ground_friction_coeff=(0.2, 1.5),  # pass a float for a fixed value
-                       base_vel_command_type="random",  # "forward", "random", "forward+rotate", "human"
-                       state_obs_names=state_observables_names,  # Desired quantities in the 'state'
-                       )
+    env = QuadrupedEnv(
+        robot="mini_cheetah",
+        hip_height=0.25,
+        legs_joint_names=robot_leg_joints,  # Joint names of the legs DoF
+        feet_geom_name=robot_feet_geom_names,  # Geom/Frame id of feet
+        scene=scene_name,
+        ref_base_lin_vel=(0.5, 1.0),  # pass a float for a fixed value
+        ground_friction_coeff=(0.2, 1.5),  # pass a float for a fixed value
+        base_vel_command_type="random",  # "forward", "random", "forward+rotate", "human"
+        state_obs_names=state_observables_names,  # Desired quantities in the 'state'
+    )
     obs = env.reset()
     env.render(tint_robot=True)
     for _ in range(10):

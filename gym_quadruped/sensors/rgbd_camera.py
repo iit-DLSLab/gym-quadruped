@@ -1,11 +1,11 @@
 from __future__ import annotations
 
-import mujoco as mj
-import numpy as np
 import os
-import cv2
 from datetime import datetime
 
+import cv2
+import mujoco as mj
+import numpy as np
 from scipy.spatial.transform import Rotation
 
 
@@ -41,7 +41,6 @@ class Camera:
         self._depth_image = np.zeros((self._height, self._width, 1), dtype=np.float32)
         self._seg_id_image = np.zeros((self._height, self._width, 3), dtype=np.float32)
         self._point_cloud = np.zeros((self._height, self._width, 1), dtype=np.float32)
-
 
         timestamp = str(datetime.now())
         timestamp = timestamp.replace(":", "_").replace(" ", "_")
@@ -190,11 +189,11 @@ class Camera:
         self._renderer.update_scene(self._data, camera=self.name)
         self._renderer.enable_depth_rendering()
         self._depth_plane = self._renderer.render()
-        i_indices, j_indices = np.meshgrid(np.arange(self.height), np.arange(self.width), indexing='ij')
+        i_indices, j_indices = np.meshgrid(np.arange(self.height), np.arange(self.width), indexing="ij")
         x_camera = (i_indices - self.K[0][2]) * self._depth_plane / self.K[0][0]
         y_camera = (j_indices - self.K[1][2]) * self._depth_plane / self.K[1][1]
-        self._depth_image = np.sqrt(self._depth_plane ** 2 + x_camera ** 2 + y_camera ** 2)
-        self._renderer.disable_depth_rendering() 
+        self._depth_image = np.sqrt(self._depth_plane**2 + x_camera**2 + y_camera**2)
+        self._renderer.disable_depth_rendering()
         return self._depth_image
 
     @property
@@ -203,9 +202,7 @@ class Camera:
         self._renderer.update_scene(self._data, camera=self.name)
         self._renderer.enable_segmentation_rendering()
 
-        self._seg_id_image = self._renderer.render()[:, :, 0].reshape(
-            (self.height, self.width)
-            )
+        self._seg_id_image = self._renderer.render()[:, :, 0].reshape((self.height, self.width))
         self._renderer.disable_segmentation_rendering()
         return self._seg_id_image
 
@@ -306,26 +303,34 @@ class Camera:
             os.makedirs(os.path.join(self._save_dir, "images"))
 
         ptr_string = "saving "
-        if img: ptr_string += "rgb image "
-        if depth: ptr_string += "depth image "
-        if seg: ptr_string += "segmentation image "
+        if img:
+            ptr_string += "rgb image "
+        if depth:
+            ptr_string += "depth image "
+        if seg:
+            ptr_string += "segmentation image "
         ptr_string += f"to {self.save_dir}"
 
         print(ptr_string)
 
         if img_name == "":
-
-            if img: cv2.imwrite(
-                self._save_dir + f"img_{self.save_counter}.png",
-                cv2.cvtColor(self.image, cv2.COLOR_RGB2BGR),
+            if img:
+                cv2.imwrite(
+                    self._save_dir + f"img_{self.save_counter}.png",
+                    cv2.cvtColor(self.image, cv2.COLOR_RGB2BGR),
                 )
-            if seg: cv2.imwrite(self._save_dir + f"seg_{self.save_counter}.png", self.seg_image)
-            if depth: np.save(self._save_dir + "/images/" + f"depth_{self.save_counter}.npy", self.depth_image)
+            if seg:
+                cv2.imwrite(self._save_dir + f"seg_{self.save_counter}.png", self.seg_image)
+            if depth:
+                np.save(self._save_dir + "/images/" + f"depth_{self.save_counter}.npy", self.depth_image)
             self.save_counter += 1
         else:
-            if img: cv2.imwrite(
-                self._save_dir + f"{img_name}_rgb.png",
-                cv2.cvtColor(self.image, cv2.COLOR_RGB2BGR),
+            if img:
+                cv2.imwrite(
+                    self._save_dir + f"{img_name}_rgb.png",
+                    cv2.cvtColor(self.image, cv2.COLOR_RGB2BGR),
                 )
-            if seg: cv2.imwrite(self._save_dir + f"{img_name}_seg.png", self.seg_image)
-            if depth: np.save(self._save_dir + "/images/" + f"{img_name}_depth.npy", self.depth_image)
+            if seg:
+                cv2.imwrite(self._save_dir + f"{img_name}_seg.png", self.seg_image)
+            if depth:
+                np.save(self._save_dir + "/images/" + f"{img_name}_depth.npy", self.depth_image)

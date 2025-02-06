@@ -10,12 +10,14 @@ def cross2(a: np.ndarray, b: np.ndarray) -> np.ndarray:  # See https://github.co
     return np.cross(a, b)
 
 
-def render_vector(viewer: Handle,
-                  vector: np.ndarray,
-                  pos: np.ndarray,
-                  scale: float,
-                  color: np.ndarray = np.array([1, 0, 0, 1]),
-                  geom_id: int = -1) -> int:
+def render_vector(
+    viewer: Handle,
+    vector: np.ndarray,
+    pos: np.ndarray,
+    scale: float,
+    color: np.ndarray = np.array([1, 0, 0, 1]),
+    geom_id: int = -1,
+) -> int:
     """
     Function to render a vector in the Mujoco viewer.
 
@@ -29,7 +31,8 @@ def render_vector(viewer: Handle,
     Returns:
         int: The id of the geometry.
     """
-    if viewer is None: return -1
+    if viewer is None:
+        return -1
     if geom_id < 0:
         # Instantiate a new geometry
         geom = mujoco.MjvGeom()
@@ -56,7 +59,7 @@ def render_vector(viewer: Handle,
         pos=pos,
         mat=ori_mat.flatten(),
         rgba=color,
-        )
+    )
     geom.category = mujoco.mjtCatBit.mjCAT_DECOR
     geom.segid = -1
     geom.objid = -1
@@ -64,11 +67,7 @@ def render_vector(viewer: Handle,
     return geom_id
 
 
-def render_sphere(viewer: Handle,
-                  position: np.ndarray,
-                  diameter: float,
-                  color: np.ndarray,
-                  geom_id: int = -1) -> int:
+def render_sphere(viewer: Handle, position: np.ndarray, diameter: float, color: np.ndarray, geom_id: int = -1) -> int:
     """
     Function to render a sphere in the Mujoco viewer.
 
@@ -98,7 +97,7 @@ def render_sphere(viewer: Handle,
         mat=np.eye(3).flatten(),
         pos=position,
         rgba=color,
-        )
+    )
 
     geom.category = mujoco.mjtCatBit.mjCAT_DECOR
     geom.segid = -1
@@ -152,8 +151,8 @@ def render_line(viewer: Handle, initial_point, target_point, width, color, geom_
         size=np.array([width, length / 2 + width / 4, width]),
         pos=(initial_point + target_point) / 2,
         mat=ori_mat.flatten(),
-        rgba=color
-        )
+        rgba=color,
+    )
 
     geom.category = mujoco.mjtCatBit.mjCAT_DECOR
     geom.segid = -1
@@ -176,8 +175,10 @@ def change_robot_appearance(mjModel: mujoco.MjModel, alpha=1.0):
         prev_color = mjModel.geom_rgba[geom_id]
         body_id = mjModel.geom_bodyid[geom_id]
         body_name = mujoco.mj_id2name(mjModel, mujoco.mjtObj.mjOBJ_BODY, body_id)
-        if geom_name in ['floor', 'plane', 'world', 'ground']: continue
-        if prev_color[-1] == 0.0: continue  # Skip transparent geoms
+        if geom_name in ["floor", "plane", "world", "ground"]:
+            continue
+        if prev_color[-1] == 0.0:
+            continue  # Skip transparent geoms
         if body_name:
             # Determine the color based on the geom_name
             if any(s in body_name.lower() for s in ["fl_", "lf_", "left", "_0"]):
@@ -196,17 +197,17 @@ def change_robot_appearance(mjModel: mujoco.MjModel, alpha=1.0):
 
 
 def render_ghost_robot(viewer: Handle, mj_model: MjModel, mj_data: MjData, alpha=0.5, ghost_geoms: dict | None = None):
-    """ Render a ghost robot in the viewer with transparency.
-    
+    """Render a ghost robot in the viewer with transparency.
+
     :param viewer: Mujoco Handle to the viewer. Assumed to be in passive mode.
     :param mj_model: Mujoco MjModel containing the Geoms of the robot.
     :param mj_data: Mujoco MjData containing the position (xpos) and orientation (xmat) of the Geoms.
     :param alpha: The transparency of the ghost robot. 0.0 is fully transparent, 1.0 is fully opaque.
-    :param ghost_geoms: A dictionary with keys as the decorative geometry ids (idx in `viewer.user_scn.geoms`) and 
+    :param ghost_geoms: A dictionary with keys as the decorative geometry ids (idx in `viewer.user_scn.geoms`) and
         values as the corresponding `MjvGeom` from visual Geometries of the MjModel. If None, the function will
         automatically create the ghost_geoms and return this dictionary so recurrent calls avoid re-creating the
-        ghost_geoms. 
-    :return: A dictionary with keys as the decorative geometry ids (idx in `viewer.user_scn.geoms`) and values as the 
+        ghost_geoms.
+    :return: A dictionary with keys as the decorative geometry ids (idx in `viewer.user_scn.geoms`) and values as the
         corresponding `MjvGeom` from visual Geometries of the MjModel.
     """
 
@@ -214,23 +215,28 @@ def render_ghost_robot(viewer: Handle, mj_model: MjModel, mj_data: MjData, alpha
         # Hacky way to get the robot Geometries from a "passive" viewer, as we cant get these from the viewer.user_scn
         # See: https://github.com/google-deepmind/mujoco/issues/1757
         scene = mujoco.MjvScene(mj_model, 200)
-        mujoco.mjv_updateScene(mj_model, mj_data,  # Create mock scene to get the Geoms
-                               mujoco.MjvOption(),
-                               None, mujoco.MjvCamera(),
-                               mujoco.mjtCatBit.mjCAT_ALL, scene)
-        visible_geoms = [g for g in scene.geoms[:scene.ngeom] if g.segid != -1]  # All non-decorative geoms in scene
+        mujoco.mjv_updateScene(
+            mj_model,
+            mj_data,  # Create mock scene to get the Geoms
+            mujoco.MjvOption(),
+            None,
+            mujoco.MjvCamera(),
+            mujoco.mjtCatBit.mjCAT_ALL,
+            scene,
+        )
+        visible_geoms = [g for g in scene.geoms[: scene.ngeom] if g.segid != -1]  # All non-decorative geoms in scene
         visible_objid = np.array([g.objid for g in visible_geoms], np.int32)  # ObjectID = model_geom_id
         visible_objtype = np.array([g.objtype for g in visible_geoms], np.int32)
 
         ghost_geoms = {}
-        for geom, model_geom_id, objtype in zip(visible_geoms, visible_objid, visible_objtype):
+        for geom, model_geom_id, objtype in zip(visible_geoms, visible_objid, visible_objtype, strict=False):
             geom_name = mujoco.mj_id2name(mj_model, mujoco.mjtObj.mjOBJ_GEOM, model_geom_id)
             body_id = mj_model.geom_bodyid[model_geom_id]
             body_name = mujoco.mj_id2name(mj_model, mujoco.mjtObj.mjOBJ_BODY, body_id)
             geom_rgba = mj_model.geom_rgba[model_geom_id]
 
             # Rule set of geoms to ignore. We dont want collision geoms or the floor ______________________________
-            ignored_names = ['floor', 'plane', 'world', 'ground']
+            ignored_names = ["floor", "plane", "world", "ground"]
             if geom_name in ignored_names or body_name in ignored_names or geom_rgba[3] == 0:
                 continue
             # ________________________________________________________________________________________________________
@@ -246,10 +252,14 @@ def render_ghost_robot(viewer: Handle, mj_model: MjModel, mj_data: MjData, alpha
         # Copy the Body Geom to the decorative geom in viewer.user_scn
         dec_geom = viewer.user_scn.geoms[dec_geom_scn_id]
         mujoco.mjv_initGeom(
-            dec_geom, type=geom.type, rgba=geom.rgba, size=geom.size,
+            dec_geom,
+            type=geom.type,
+            rgba=geom.rgba,
+            size=geom.size,
             # Use the position and orientation from the mjData
-            pos=mj_data.geom_xpos[geom_model_id], mat=mj_data.geom_xmat[geom_model_id].reshape(9),
-            )
+            pos=mj_data.geom_xpos[geom_model_id],
+            mat=mj_data.geom_xmat[geom_model_id].reshape(9),
+        )
         # Ensure ghost decorative geometries are ignored in segmentation, collisions, etc.
         dec_geom.category = mujoco.mjtCatBit.mjCAT_DECOR
         dec_geom.segid = -1

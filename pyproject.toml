@@ -78,12 +78,11 @@ exclude = [
     "venv",
 ]
 
+[tool.ruff.lint]
+select = ["E", "F", "I", "N", "B", "C4", "SIM"]
+
 [tool.ruff.pydocstyle]
 convention = "google"
-
-[tool.ruff.lint]
-select = ["E4", "E7", "E9", "F", "I", "N", "B", "C4", "SIM"]
-ignore-init-module-imports = true
 
 #_______________________________________________________
 [build-system]
