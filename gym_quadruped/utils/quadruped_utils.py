@@ -284,7 +284,7 @@ def configure_observation_space(mj_model: mujoco.MjModel, obs_names: Sequence[st
             obs_dim = 12
             obs_lim_max = [np.inf] * obs_dim
             obs_lim_min = [-np.inf] * obs_dim
-        elif "gravity_vector" in obs_name:
+        elif "gravity_vector" in obs_name or "imu" in obs_name:
             obs_dim = 3
             obs_lim_max = [np.inf] * obs_dim
             obs_lim_min = [-np.inf] * obs_dim

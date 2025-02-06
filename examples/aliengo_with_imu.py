@@ -40,8 +40,18 @@ robot_leg_joints = dict(
     ],
 )
 
-state_observables_names = tuple(QuadrupedEnv.ALL_OBS)  # return all available state observables
 
+imu_kwargs = dict(
+    accel_name="Body_Acc",
+    gyro_name="Body_Gyro",
+    imu_site_name="imu",
+    accel_noise=0.01,
+    gyro_noise=0.01,
+    accel_bias_rate=0.01,
+    gyro_bias_rate=0.01,
+)
+
+state_observables_names = tuple(["qpos", "qvel"]) + tuple(IMU.ALL_OBS)  # return all available state observables
 env = QuadrupedEnv(
     robot=robot_name,
     hip_height=0.25,
@@ -51,22 +61,19 @@ env = QuadrupedEnv(
     ref_base_lin_vel=0.5,  # Constant magnitude of reference base linear velocity [m/s]
     base_vel_command_type="forward",  # "forward", "random", "forward+rotate", "human"
     state_obs_names=state_observables_names,  # Desired quantities in the 'state'
+    imu_kwargs=imu_kwargs,
 )
 
 obs = env.reset()
 env.render()
 
-imu = IMU(mj_model=env.mjModel, mj_data=env.mjData, accel_name="Body_Acc", gyro_name="Body_Gyro", imu_site_name="imu")
-
-imu.prepare2show()
-
 dt = 0.1
 t0 = 0.0
 while True:
-    imu_accel, accel_noise, accel_bias = imu.get_accel
-    imu_gyro, gyro_noise, gyro_bias = imu.get_gyro
-    X = imu.get_imu_frame
-
-    imu.show(t0, accel_noise, gyro_noise, accel_bias, gyro_bias)
-
-    t0 += dt
+    # Sensor gets updated only at the evolution of the simulation
+    action = env.action_space.sample() * 50  # Sample random action
+    state, reward, is_terminated, is_truncated, info = env.step(action=action)
+    env.render()
+    imu_acc, imu_acc_noise, imu_acc_bias = state["imu_acc"], state["imu_acc_noise"], state["imu_acc_bias"]
+    imu_gyro, imu_gyro_noise, imu_gyro_bias = state["imu_gyro"], state["imu_gyro_noise"], state["imu_gyro_bias"]
+    print(f"t: {t0:.2f}, \n\taccel: {imu_acc}, \n\tgyro: {imu_gyro}")

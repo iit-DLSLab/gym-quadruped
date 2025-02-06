@@ -80,6 +80,7 @@ class QuadrupedEnv(gym.Env):
         ground_friction_coeff: Union[tuple[float, float], float] = 1.0,
         legs_order: tuple[str, str, str, str] = ("FL", "FR", "RL", "RR"),
         feet_geom_name: dict = None,
+        imu_kwargs: dict = None,  #
     ):
         """Initialize the quadruped environment.
 
@@ -219,6 +220,14 @@ class QuadrupedEnv(gym.Env):
         self.observation_space = configure_observation_space(mj_model=self.mjModel, obs_names=state_obs_names)
         self.state_obs_names = state_obs_names
 
+        # Initialize the IMU sensor if the kwargs are provided _______________________________________________________
+        self.imu = None
+        if imu_kwargs is not None:
+            from gym_quadruped.sensors.imu import IMU
+
+            self.imu = IMU(mj_model=self.mjModel, mj_data=self.mjData, **imu_kwargs)
+
+        # ______________________________________________________________________________________________________________
         self.viewer = None
         self.step_num = 0
         # Reference base velocity in "Horizontal" frame (see heading_orientation_SO3)
@@ -244,6 +253,10 @@ class QuadrupedEnv(gym.Env):
         # Apply action (torque) to the robot
         self.mjData.ctrl = action
         mujoco.mj_step(self.mjModel, self.mjData)
+
+        # Step all custom sensors if present.
+        if self.imu is not None:
+            self.imu.step()
 
         # Get observation
         obs = self._get_obs()
@@ -982,6 +995,8 @@ class QuadrupedEnv(gym.Env):
                 obs_val = np.concatenate(contact_forces.to_list(order=self.legs_order), axis=0).copy()
             elif "gravity_vector" in obs_name:
                 obs_val = self.gravity_vector.copy()
+            elif "imu" in obs_name:
+                obs_val = self.imu.get_observation(obs_name)
             else:
                 raise ValueError(f"Invalid observation name: {obs_name}, available obs: {self.ALL_OBS}")
 

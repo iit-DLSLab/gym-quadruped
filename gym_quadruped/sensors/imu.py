@@ -15,8 +15,17 @@ import matplotlib.pyplot as plt
 import numpy as np
 from scipy.spatial.transform import Rotation
 
+LIN_ACC_OBS = ("imu_acc", "imu_acc_noise", "imu_acc_bias")
+GYRO_OBS = ("imu_gyro", "imu_gyro_noise", "imu_gyro_bias")
+
 
 class IMU:
+    """
+    TODO: Ensure reproducibility by ensuring noise is sampled with a fixed seed
+    """
+
+    ALL_OBS = LIN_ACC_OBS + GYRO_OBS
+
     def __init__(
         self,
         mj_model,
@@ -45,11 +54,16 @@ class IMU:
         self._mj_model = mj_model
         self._mj_data = mj_data
 
-        self._accel_noise = accel_noise
+        # Variables holding the last sensor measurements, noise, and bias
+        self._lin_acc_measurements = [np.ones(3) * np.NAN] * 3
+        self._gyro_measurements = [np.ones(3) * np.NAN] * 3
+
+        self._acc_noise = accel_noise
         self._gyro_noise = gyro_noise
-        self._accel_bias_drift = accel_bias_rate
+        self._acc_bias_drift = accel_bias_rate
         self._gyro_bias_drift = gyro_bias_rate
 
+        # TODO: Check if the sensors are present in the model. Provide a better error message
         self._accel_name = accel_name
         self._gyro_name = gyro_name
 
@@ -69,15 +83,40 @@ class IMU:
         # Turn off to inspect data
         self._show = False
 
-    @property
-    def get_accel(self, dt=1.0) -> tuple:
+    def get_observation(self, obs_name):
+        """
+        Get observation from the IMU
+        """
+        if obs_name == "imu_acc":
+            return self._lin_acc_measurements[0].copy()
+        elif obs_name == "imu_acc_noise":
+            return self._lin_acc_measurements[1].copy()
+        elif obs_name == "imu_acc_bias":
+            return self._lin_acc_measurements[2].copy()
+        elif obs_name == "imu_gyro":
+            return self._gyro_measurements[0].copy()
+        elif obs_name == "imu_gyro_noise":
+            return self._gyro_measurements[1].copy()
+        elif obs_name == "imu_gyro_bias":
+            return self._gyro_measurements[2].copy()
+        else:
+            raise ValueError(f"Invalid observation name {obs_name}")
+
+    def step(self):
+        """
+        Simulate the IMU measurement process. Compute noise once per step.
+        """
+        self.compute_linear_acceleration()
+        self.compute_angular_velocity()
+
+    def compute_linear_acceleration(self, dt=1.0):
         """
         Get current linear acceleration measured by the IMU
         """
-        base_lin_acc_noise = np.random.normal(0, self._accel_noise, 3)
+        base_lin_acc_noise = np.random.normal(0, self._acc_noise, 3)
 
         # Assuming dt*drift = bias (TODO: pass dt)
-        self._imu_accel_bias += np.random.normal(0, self._accel_bias_drift, 3)
+        self._imu_accel_bias += np.random.normal(0, self._acc_bias_drift, 3)
 
         accel_id = self._accel_id
         accel = self._mj_data.sensordata[accel_id : accel_id + 3]
@@ -88,10 +127,9 @@ class IMU:
         # add noise and biases to the real value
         accel += dt * self._imu_accel_bias + base_lin_acc_noise
 
-        return accel, base_lin_acc_noise, self._imu_accel_bias
+        self._lin_acc_measurements = accel, base_lin_acc_noise, self._imu_accel_bias
 
-    @property
-    def get_gyro(self, dt=1.0) -> np.array:
+    def compute_angular_velocity(self, dt=1.0):
         """
         Get current angular velocity measured by the IMU
         """
@@ -100,12 +138,25 @@ class IMU:
 
         gyro_id = self._gyro_id
         gyro = self._mj_data.sensordata[gyro_id : gyro_id + 3]
-        # gyro_2 = self._mj_data.sensor(self._gyro_name).data
 
         # add noise and biases to the real value
         gyro += dt * self._imu_accel_bias + base_ang_vel_noise
 
-        return gyro, base_ang_vel_noise, self._imu_gyro_bias
+        self._gyro_measurements = gyro, base_ang_vel_noise, self._imu_gyro_bias
+
+    @property
+    def linear_acceleration(self):
+        """
+        Get the linear acceleration of the IMU
+        """
+        return self._lin_acc_measurements
+
+    @property
+    def angular_velocity(self):
+        """
+        Get the angular velocity of the IMU
+        """
+        return self._gyro_measurements
 
     @property
     def get_imu_frame(self) -> np.array:
@@ -117,6 +168,8 @@ class IMU:
     def prepare2show(self):
         """
         Create canvas and legends for the IMU data
+
+        TODO: This function should not be implemented here, it should be in utils plotting. Not part of this class
         """
         self.time = []
         self.accel_x = []
@@ -152,6 +205,9 @@ class IMU:
     def show(self, time, accel_noise, gyro_noise, accel_bias, gyro_bias):
         """
         Show the IMU data in the canvas
+
+        TODO: This function should not be implemented here, it should be in utils plotting. Not part of this class
+
         """
         if not self._show:
             return
