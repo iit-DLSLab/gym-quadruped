@@ -10,7 +10,7 @@ from scipy.spatial.transform import Rotation
 
 
 class Camera:
-	def __init__(self, width, height, fps, model, data, cam_name: str = '', save_dir='data/img/'):
+	def __init__(self, width, height, fps, mj_model, mj_data, cam_name: str = '', save_dir='data/img/'):
 		"""Initialize Camera instance.
 
 		Args:
@@ -21,20 +21,20 @@ class Camera:
 		- save_dir: Directory to save captured images.
 		"""
 		self._cam_name = cam_name
-		self._model = model
-		self._data = data
+		self._mj_data = mj_model
+		self._mj_model = mj_data
 		self._save_dir = save_dir + self._cam_name + '/'
 		self.save_counter = 0
 		self.interval = float(1 / fps)
-		self.last_time = float(data.time)  # in seconds
+		self.last_time = float(mj_data.time)  # in seconds
 
 		self._width = width
 		self._height = height
-		self._cam_id = self._data.cam(self._cam_name).id
+		self._cam_id = self._mj_model.cam(self._cam_name).id
 
-		self._renderer = mj.Renderer(self._model, self._height, self._width)
+		self._renderer = mj.Renderer(self._mj_data, self._height, self._width)
 		self._camera = mj.MjvCamera()
-		self._scene = mj.MjvScene(self._model, maxgeom=10_000)
+		self._scene = mj.MjvScene(self._mj_data, maxgeom=10_000)
 
 		self._image = np.zeros((self._height, self._width, 3), dtype=np.uint8)
 		self._depth_plane = np.zeros((self._height, self._width, 1), dtype=np.float32)
@@ -155,8 +155,8 @@ class Camera:
 		Returns:
 		np.ndarray: The 4x4 homogeneous transformation matrix representing the camera's pose.
 		"""
-		pos = self._data.cam(self._cam_id).xpos
-		rot = self._data.cam(self._cam_id).xmat.reshape(3, 3).T
+		pos = self._mj_model.cam(self._cam_id).xpos
+		rot = self._mj_model.cam(self._cam_id).xmat.reshape(3, 3).T
 		T = np.eye(4)
 		T[:3, :3] = Rotation.from_matrix(rot)
 		T[:3, 3] = pos
@@ -178,7 +178,7 @@ class Camera:
 	@property
 	def image(self) -> np.ndarray:
 		"""Return the captured RGB image."""
-		self._renderer.update_scene(self._data, camera=self.name)
+		self._renderer.update_scene(self._mj_model, camera=self.name)
 		self._image = self._renderer.render()
 		self._image = cv2.cvtColor(self._image, cv2.COLOR_BGR2RGB)
 		return self._image
@@ -186,7 +186,7 @@ class Camera:
 	@property
 	def depth_image(self) -> np.ndarray:
 		"""Return the captured depth image."""
-		self._renderer.update_scene(self._data, camera=self.name)
+		self._renderer.update_scene(self._mj_model, camera=self.name)
 		self._renderer.enable_depth_rendering()
 		self._depth_plane = self._renderer.render()
 		i_indices, j_indices = np.meshgrid(np.arange(self.height), np.arange(self.width), indexing='ij')
@@ -199,7 +199,7 @@ class Camera:
 	@property
 	def seg_image(self) -> np.ndarray:
 		"""Return the captured segmentation image based on object's id."""
-		self._renderer.update_scene(self._data, camera=self.name)
+		self._renderer.update_scene(self._mj_model, camera=self.name)
 		self._renderer.enable_segmentation_rendering()
 
 		self._seg_id_image = self._renderer.render()[:, :, 0].reshape((self.height, self.width))
@@ -219,7 +219,7 @@ class Camera:
 		Returns:
 		- float: The field of view angle in degrees.
 		"""
-		return self._model.cam(self._cam_id).fovy[0]
+		return self._mj_data.cam(self._cam_id).fovy[0]
 
 	@property
 	def id(self) -> int:

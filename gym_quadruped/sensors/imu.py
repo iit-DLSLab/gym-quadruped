@@ -15,11 +15,13 @@ import matplotlib.pyplot as plt
 import numpy as np
 from scipy.spatial.transform import Rotation
 
+from gym_quadruped.sensors.base_sensor import Sensor
+
 LIN_ACC_OBS = ('imu_acc', 'imu_acc_noise', 'imu_acc_bias')
 GYRO_OBS = ('imu_gyro', 'imu_gyro_noise', 'imu_gyro_bias')
 
 
-class IMU:
+class IMU(Sensor):
 	"""
 	TODO: Ensure reproducibility by ensuring noise is sampled with a fixed seed
 	"""
@@ -51,8 +53,7 @@ class IMU:
 		acc_bias: float with accelerometer's bias assuming the same for all axes (m/s³)
 		gyro_bias: float with gyroscope's bias assuming the same for all axes (rad/s²)
 		"""
-		self._mj_model = mj_model
-		self._mj_data = mj_data
+		super().__init__(mj_model, mj_data)
 
 		# Variables holding the last sensor measurements, noise, and bias
 		self._lin_acc_measurements = [np.ones(3) * np.NAN] * 3
@@ -101,6 +102,13 @@ class IMU:
 			return self._gyro_measurements[2].copy()
 		else:
 			raise ValueError(f'Invalid observation name {obs_name}')
+
+	@staticmethod
+	def available_observations():
+		"""
+		Get all available observations from the IMU
+		"""
+		return IMU.ALL_OBS
 
 	def step(self):
 		"""

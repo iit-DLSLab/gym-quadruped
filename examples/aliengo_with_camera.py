@@ -48,8 +48,8 @@ cam = Camera(
 	width=640,
 	height=480,
 	fps=30,
-	model=env.robot_model,
-	data=env.sim_data,
+	mj_model=env.robot_model,
+	mj_data=env.sim_data,
 	cam_name='robotcam',  # camera must be inserted on the .xml file of the robot in order to work
 	save_dir='data_',
 )

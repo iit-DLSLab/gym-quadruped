@@ -156,6 +156,7 @@ if __name__ == '__main__':
 	print(
 		f'Loaded a dataset with {dataset.len()} simulated episodes and observations: \n{dataset.env_hparams["state_obs_names"]}'
 	)
+
 	# You can access each observation data using a numpy like interface
 	obs_names = dataset.env_hparams['state_obs_names']
 	for obs_name in obs_names:

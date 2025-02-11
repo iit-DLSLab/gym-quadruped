@@ -16,6 +16,7 @@ from mujoco import MjData, MjModel
 from scipy.spatial.transform import Rotation
 from typing_extensions import deprecated
 
+from gym_quadruped.sensors.base_sensor import Sensor
 from gym_quadruped.utils.math_utils import angle_between_vectors, homogenous_transform
 from gym_quadruped.utils.mujoco.terrain import add_world_of_boxes, add_world_of_pyramid
 from gym_quadruped.utils.mujoco.visual import (
@@ -90,7 +91,8 @@ class QuadrupedEnv(gym.Env):
 		ground_friction_coeff: tuple[float, float] | float = 1.0,
 		legs_order: tuple[str, str, str, str] = ('FL', 'FR', 'RL', 'RR'),
 		feet_geom_name: dict = None,
-		imu_kwargs: dict = None,  #
+		sensors: tuple[{Sensor}, ...] = None,  # Class names of Sensor instances
+		sensors_kwargs: tuple[dict[str, Any]] = None,
 	):
 		"""Initialize the quadruped environment.
 
@@ -121,6 +123,8 @@ class QuadrupedEnv(gym.Env):
 		        how state observations of legs observables (e.g., feet positions) are ordered in the state vector.
 		    feet_geom_name: (dict) Dict with keys FL, FR, RL, RR; and as values the name of the Mujoco geometry
 		        (MjvGeom) associated with the feet/contact-point of each leg. Used to compute the ground contact forces.
+		    sensors: (tuple) Tuple with the class names of the sensors to add to the environment.
+		    sensors_kwargs: (tuple) Tuple with the kwargs to pass to the sensors constructors.
 		"""
 		super(QuadrupedEnv, self).__init__()
 
@@ -154,7 +158,7 @@ class QuadrupedEnv(gym.Env):
 		self.terrain_radius = None
 		self.terrain_center = None
 
-		# Random terrain generation
+		# Random terrain generation # TODO: Automate terrain generation outside of the environment
 		if scene == 'random_boxes' or scene == 'random_pyramids':
 			self.model_file_path = self.base_path / 'scene_flat.xml'
 			if scene == 'random_boxes':
@@ -236,13 +240,10 @@ class QuadrupedEnv(gym.Env):
 		self.observation_space = configure_observation_space(mj_model=self.mjModel, obs_names=state_obs_names)
 		self.state_obs_names = state_obs_names
 
-		# Initialize the IMU sensor if the kwargs are provided _______________________________________________________
-		self.imu = None
-		if imu_kwargs is not None:
-			from gym_quadruped.sensors.imu import IMU
-
-			self.imu = IMU(mj_model=self.mjModel, mj_data=self.mjData, **imu_kwargs)
-
+		# Initialize sensors if provided _______________________________________________________
+		self.sensors = []
+		for sensor_cls, sensor_kwargs in zip(sensors, sensors_kwargs, strict=False):
+			self.sensors.append(sensor_cls(mj_model=self.mjModel, mj_data=self.mjData, **sensor_kwargs))
 		# ______________________________________________________________________________________________________________
 		self.viewer = None
 		self.step_num = 0
@@ -271,8 +272,8 @@ class QuadrupedEnv(gym.Env):
 		mujoco.mj_step(self.mjModel, self.mjData)
 
 		# Step all custom sensors if present.
-		if self.imu is not None:
-			self.imu.step()
+		for sensor in self.sensors:
+			sensor.step()
 
 		# Get observation
 		obs = self._get_obs()
@@ -1022,10 +1023,15 @@ class QuadrupedEnv(gym.Env):
 				obs_val = np.concatenate(contact_forces.to_list(order=self.legs_order), axis=0).copy()
 			elif 'gravity_vector' in obs_name:
 				obs_val = self.gravity_vector.copy()
-			elif 'imu' in obs_name:
-				obs_val = self.imu.get_observation(obs_name)
-			else:
-				raise ValueError(f'Invalid observation name: {obs_name}, available obs: {self.ALL_OBS}')
+			else:  # If not a predefined observation, check if it is a sensor observation
+				is_sensor_obs = False
+				for sensor in self.sensors:
+					if obs_name in sensor.available_observations():
+						obs_val = sensor.get_observation(obs_name)
+						is_sensor_obs = True
+						break
+				if not is_sensor_obs:
+					raise ValueError(f'Invalid observation name: {obs_name}, available obs: {self.ALL_OBS}')
 
 			assert self.observation_space[obs_name].shape == obs_val.shape, (
 				f'Invalid shape for observation {obs_name}: {obs_val.shape} != {self.observation_space[obs_name].shape}'

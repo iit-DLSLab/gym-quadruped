@@ -232,7 +232,7 @@ def extract_mj_joint_info(model: mujoco.MjModel) -> OrderedDict[str, JointInfo]:
 	return joint_info
 
 
-def configure_observation_space(mj_model: mujoco.MjModel, obs_names: Sequence[str]) -> [spaces.Space]:
+def configure_observation_space(mj_model: mujoco.MjModel, obs_names: Sequence[str]) -> [spaces.Dict]:
 	"""Configures the observation space for the environment based on the provided state observation names.
 
 	Args:

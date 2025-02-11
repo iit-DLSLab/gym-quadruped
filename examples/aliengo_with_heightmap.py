@@ -44,7 +44,7 @@ env = QuadrupedEnv(
 obs = env.reset()
 
 # adding the heightmap
-heightmap = HeightMap(n=5, dist_x=0.1, dist_y=0.1, mjModel=env.mjModel, mjData=env.mjData)
+heightmap = HeightMap(n=5, dist_x=0.1, dist_y=0.1, mj_model=env.mjModel, mj_data=env.mjData)
 env.render()
 
 

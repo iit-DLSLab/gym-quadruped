@@ -15,7 +15,7 @@ np.set_printoptions(precision=3, suppress=True)
 
 
 class HeightMap:
-	def __init__(self, n, dist_x, dist_y, mjModel, mjData):
+	def __init__(self, n, dist_x, dist_y, mj_model, mj_data):
 		"""
 		init function of the grid_map class
 		n: is the size of the heightmap in particular the number of lines we want to have in our heightmap it must be an odd number but is handled by the constructor
@@ -25,10 +25,10 @@ class HeightMap:
 		mjData: mujoco data
 		"""
 
-		self.mjModel = mjModel
-		self.mjData = mjData
+		self.mj_model = mj_model
+		self.mj_data = mj_data
 		self.use_map_initialization = False
-		self.last_time = float(mjData.time)
+		self.last_time = float(mj_data.time)
 		self.data = None
 
 		self.geom_ids = -np.ones((n, n), dtype=np.int32)
@@ -89,8 +89,8 @@ class HeightMap:
 		geomid = np.zeros(1, dtype=np.int32)
 
 		self.z = mujoco.mj_ray(
-			m=self.mjModel,
-			d=self.mjData,
+			m=self.mj_model,
+			d=self.mj_data,
 			pnt=ray_sensor_site,
 			vec=direction_vector,
 			geomgroup=geomgroup,
@@ -210,7 +210,7 @@ class HeightMap:
 
 	# ====================================================================
 	def create_height_map(self):
-		self.data = self.create_sensor_matrix(self.mjData.xpos[1])
+		self.data = self.create_sensor_matrix(self.mj_data.xpos[1])
 
 		return self.data
 
