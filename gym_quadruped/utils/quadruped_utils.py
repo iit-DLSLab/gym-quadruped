@@ -365,8 +365,10 @@ def configure_observation_space_representations(
             obs_reps[obs_name] = rep_kin_three
         elif "contact_forces" in obs_name:
             obs_reps[obs_name] = rep_Rd_on_limbs
-        elif "gravity_vector" in obs_name:
+        elif "gravity_vector" in obs_name or "imu_acc" in obs_names:
             obs_reps[obs_name] = rep_Rd
+        elif "imu_gyro" in obs_names:  # Same as angular velocity
+            obs_reps[obs_name] = rep_Rd_pseudo
         else:
             from gym_quadruped.quadruped_env import QuadrupedEnv
 
