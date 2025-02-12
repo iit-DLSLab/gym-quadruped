@@ -9,7 +9,7 @@ HISTORY:
 Date      	By	Comments
 ----------	---	----------------------------------------------------------
 """
-
+import importlib
 import json
 from pathlib import Path
 
@@ -31,7 +31,15 @@ def save_dict_to_h5(h5group, data):
 			subgroup = h5group.require_group(key)
 			save_dict_to_h5(subgroup, value)
 		elif isinstance(value, (list, tuple)):  # Convert lists/tuples to JSON strings
-			h5group.attrs[key] = json.dumps(value)
+			try:
+				h5group.attrs[key] = json.dumps(value)
+			except TypeError:  # Type in list/tuple is not JSON serializable, use custom logic.
+				_a = value[0]
+				if isinstance(_a, type): # Class references
+					str_vals = [f"TYPE:{v.__module__}.{v.__name__}" for v in value]
+					h5group.attrs[key] = json.dumps(str_vals)
+				else:
+					raise NotImplementedError(f"Need to define how to store {type(_a)} objects")
 		elif isinstance(value, (str, int, float, bool, np.ndarray)):  # Store primitive types
 			h5group.attrs[key] = value
 		elif value is None:  # Store None as a special case
@@ -46,14 +54,32 @@ def load_dict_from_h5(h5group):
 
 	h5group: An open h5py.Group object.
 	"""
+
+	def import_class_from_str(str_class):
+		assert str_class.startswith("TYPE:"), f"Invalid class reference: {str_class}"
+		ref = str_class.split(":")[1]
+		module_name, class_name = ref.rsplit(".", 1)
+		try:
+			module = importlib.import_module(module_name)
+			class_ = getattr(module, class_name)
+			return class_
+		except ImportError as e:
+			raise ImportError(f"Error importing module {module_name} for class {class_name}") from e
+
 	data = {}
 
 	# Load attributes (key-value pairs)
 	for key, value in h5group.attrs.items():
 		try:
 			data[key] = json.loads(value)  # Decode JSON strings back to lists/tuples
+			# Check if the list contains class references
+			if isinstance(data[key], list) and len(data[key]) > 0:
+				for i, element in enumerate(data[key]):
+					if isinstance(element, str) and element.startswith("TYPE:"):
+						data[key][i] = import_class_from_str(element)
 		except (json.JSONDecodeError, TypeError):
 			data[key] = value  # Otherwise, store as-is
+
 
 	# Load nested groups (dictionaries)
 	for key, subgroup in h5group.items():
