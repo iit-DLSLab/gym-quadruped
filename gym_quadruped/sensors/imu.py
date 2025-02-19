@@ -56,8 +56,8 @@ class IMU(Sensor):
 		super().__init__(mj_model, mj_data)
 
 		# Variables holding the last sensor measurements, noise, and bias
-		self._lin_acc_measurements = [np.ones(3) * np.NAN] * 3
-		self._gyro_measurements = [np.ones(3) * np.NAN] * 3
+		self._lin_acc_measurements = [np.ones(3) * np.nan] * 3
+		self._gyro_measurements = [np.ones(3) * np.nan] * 3
 
 		self._acc_noise = accel_noise
 		self._gyro_noise = gyro_noise

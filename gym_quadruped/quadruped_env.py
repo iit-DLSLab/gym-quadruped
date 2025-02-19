@@ -242,8 +242,9 @@ class QuadrupedEnv(gym.Env):
 
 		# Initialize sensors if provided _______________________________________________________
 		self.sensors = []
-		for sensor_cls, sensor_kwargs in zip(sensors, sensors_kwargs, strict=False):
-			self.sensors.append(sensor_cls(mj_model=self.mjModel, mj_data=self.mjData, **sensor_kwargs))
+		if sensors is not None:
+			for sensor_cls, sensor_kwargs in zip(sensors, sensors_kwargs, strict=False):
+				self.sensors.append(sensor_cls(mj_model=self.mjModel, mj_data=self.mjData, **sensor_kwargs))
 		# ______________________________________________________________________________________________________________
 		self.viewer = None
 		self.step_num = 0

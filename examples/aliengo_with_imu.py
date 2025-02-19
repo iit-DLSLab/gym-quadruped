@@ -61,7 +61,7 @@ env = QuadrupedEnv(
 	ref_base_lin_vel=0.5,  # Constant magnitude of reference base linear velocity [m/s]
 	base_vel_command_type='forward',  # "forward", "random", "forward+rotate", "human"
 	state_obs_names=state_observables_names,  # Desired quantities in the 'state'
-	sensors=(IMU),  # Add IMU sensor to the environment
+	sensors=(IMU,),  # Add IMU sensor to the environment
 	sensors_kwargs=(imu_kwargs,),  # Pass the IMU sensor kwargs
 )
 
