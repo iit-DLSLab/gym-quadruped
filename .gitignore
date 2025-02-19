@@ -14,7 +14,7 @@ output/
 *.DS_Store
 .ipynb_checkpoints/
 *.log
-
+*.h5
 .vscode/
 
 *.pkl
