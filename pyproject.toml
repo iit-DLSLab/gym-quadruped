@@ -1,6 +1,6 @@
 [project]
 name = "gym-quadruped"
-version = "0.0.3"
+version = "0.0.9"
 description = "A gym environment for quadruped robots using MuJoCo physics engine."
 authors = [
     { name="Daniel Ordoñez-Apraez", email="daniels.ordonez@gmail.com" },
@@ -25,32 +25,17 @@ packages = [{include = "gym_quadruped"}]
 
 dependencies = [
     "numpy",
-    "scipy",
+    "scipy==1.15.1",
     "robot_descriptions",
-    "mujoco==3.1.1",
+    "mujoco==3.1.5",
     "noise",
+    "opencv-python",
+    "h5py",
 ]
 
 [tool.ruff]
 line-length = 120
 target-version = "py310"
-select = [
-    # pyflakes
-    "F",
-    # pycodestyle
-    "E",
-    "W",
-    # isort
-    "I001",
-    # pydocstyle
-    "D"
-]
-ignore = [
-    "D401",  # good for methods but not for class docstrings
-    "D405",  # British-style section names are also "proper"!
-    "E701",  # short single-line statements are fine
-    "D100",
-]
 
 exclude = [
     ".bzr",
@@ -77,12 +62,39 @@ exclude = [
     "venv",
 ]
 
-[tool.ruff.pydocstyle]
-convention = "google"
 
 [tool.ruff.lint]
-select = ["E4", "E7", "E9", "F", "I", "N", "B", "C4", "SIM"]
-ignore-init-module-imports = true
+select = [
+    "E",    # pycodestyle
+#    "W",    # pycodestyle
+    "F",    # Pyflakes
+    "I",
+    "N",
+    "B",
+    "C4",
+    "UP",
+    "FA",
+    "ISC",
+    "ICN",
+    "SIM"   # flake8-simplify
+]
+ignore = [
+    "D401",  # good for methods but not for class docstrings
+    "D405",  # British-style section names are also "proper"!
+    "E701",  # short single-line statements are fine
+    "D100",
+    "N806",  # Uppercase letters are useful sometimes, we are not python Hitler here
+    "N806",  # Uppercase letters are useful sometimes, we are not python Hitler here
+]
+
+[tool.ruff.lint.pydocstyle]
+convention = "google"
+
+[tool.ruff.format]
+quote-style = "single"
+indent-style = "tab"
+docstring-code-format = true
+
 
 #_______________________________________________________
 [build-system]
