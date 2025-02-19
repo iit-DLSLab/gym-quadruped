@@ -95,7 +95,6 @@ class MujocoPlotter:
 		joint_names: list = None,
 		window_size: int = 50,
 		enable: bool = True,
-		transparant: float = 1.0
 	):
 		if enable is False or self.all_plot_enable is False:
 			return
@@ -105,7 +104,6 @@ class MujocoPlotter:
 			legs=legs,
 			joint_names=joint_names,
 			window_size=window_size,
-			transparant=transparant
 		)
 
 	def jointpos_plot(
@@ -429,7 +427,7 @@ class MultiLivePlotter(mp.Process):
 if __name__ == '__main__':
 	# Example usage: 2 subplots, window size of 50
 	# Titles, X-limits, and Y-limits for each subplot
-	titles = ['Random Stream A', 'Random Stream B']
+	titles = ['Random Stream A']#, 'Random Stream B']
 	x_lims = [(0, 50), (0, 50)]
 	y_lims = [(0, 2), (0, 1)]  # Different Y ranges for demonstration
 
@@ -438,11 +436,10 @@ if __name__ == '__main__':
 		figure_name='example',
 		subplot_titles=titles,
 		rows=1,
-		cols=2,
+		cols=1,
 		y_limits=y_lims,
 		window_size=50,
-		transparant=0.1,
-		plots_per_ax=1
+		plots_per_ax=2
 	)
 	plotter.start()
 
