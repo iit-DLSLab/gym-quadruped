@@ -80,7 +80,10 @@ def render_sphere(viewer: Handle, position: np.ndarray, diameter: float, color: 
 	Returns:
 	    int: The id of the geometry.
 	"""
-	if geom_id < 0:
+	if viewer is None:
+		return -1
+
+	if geom_id < 0 or geom_id is None:
 		# Instantiate a new geometry
 		geom = mujoco.MjvGeom()
 		geom.type = mujoco.mjtGeom.mjGEOM_SPHERE
@@ -120,7 +123,9 @@ def render_line(viewer: Handle, initial_point, target_point, width, color, geom_
 	Returns:
 	    int: The id of the geometry.
 	"""
-	if geom_id < 0:
+	if viewer is None:
+		return -1
+	if geom_id < 0 or geom_id is None:
 		# Instantiate a new geometry
 		viewer.user_scn.ngeom += 1
 		geom_id = viewer.user_scn.ngeom - 1
