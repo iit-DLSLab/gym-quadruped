@@ -49,3 +49,12 @@ def angle_between_vectors(vector1: np.ndarray, vector2: np.ndarray) -> float:
     return np.arccos(dot_product / (magnitude_vector1 * magnitude_vector2))"""
 	vector_diff = vector2 - vector1
 	return np.arctan2(vector_diff[1], vector_diff[0])
+
+
+def _process_range(values):
+	# IF vallue is a number
+	if isinstance(values, (int, float, np.number)):
+		return (values, values)  # Min, Max
+	elif isinstance(values, (tuple, list, np.ndarray)):
+		assert len(values) == 2, f'Invalid range values, expected (min, max) got: {values}'
+		return values
