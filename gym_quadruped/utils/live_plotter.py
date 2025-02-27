@@ -19,7 +19,8 @@ class MujocoPlotter:
 
 		self.legs = ['FL', 'FR', 'RL', 'RR']
 		self.joint_names = ['HAA', 'HFE', 'KFE']
-		self.predefined_plots = ['Torque', 'JointPos', 'JointVel', 'FootContacts']
+		self.predefined_plots = ['Torque', 'JointPos', 'JointVel', 'FootContacts', 'LinAcc', 'AngVel']
+		self.axis = ['X', 'Y', 'Z']
 
 		self.all_plot_enable = enable
 
@@ -31,23 +32,21 @@ class MujocoPlotter:
 		rows: int = 1,
 		cols: int = 1,
 		window_size: int = 50,
-		plots_per_ax:int=1
 	):
 		"""
 		Create new Plot figure
 		"""
 		if y_limits is None:
 			y_limits = [-1, 1]
-
 		plotter = MultiLivePlotter(
 			figure_name=figure_name,
+			num_subplots=rows * cols,
 			subplot_titles=subplot_titles,
 			nrows=rows,
 			ncols=cols,
 			window_size=window_size,
 			x_limits=[(0, window_size)] * (rows * cols),
 			y_limits=y_limits * (rows * cols),
-			plot_per_ax=plots_per_ax
 		)
 		self.plots[figure_name] = plotter
 
@@ -58,7 +57,7 @@ class MujocoPlotter:
 		y_limit: list,
 		legs: list = None,
 		joint_names: list = None,
-		window_size: int = 50
+		window_size: int = 50,
 	):
 		if name not in self.predefined_plots:
 			print(f'Error: predefined plot {name} does not exist between: {self.predefined_plots}')
@@ -78,7 +77,6 @@ class MujocoPlotter:
 			for joint_name in joint_names:
 				cols += 1
 				titles += [f'{name} {leg}_{joint_name}']
-
 		self.create(
 			figure_name=name,
 			rows=rows,
@@ -100,7 +98,7 @@ class MujocoPlotter:
 			return
 		self.torque_legs, self.torque_joint_names = self.predefined_plot(
 			name='Torque',
-			y_limit=[(-35, 35)],
+			y_limit=[(-120, 120)],
 			legs=legs,
 			joint_names=joint_names,
 			window_size=window_size,
@@ -111,7 +109,7 @@ class MujocoPlotter:
 		legs: list = None,
 		joint_names: list = None,
 		window_size: int = 50,
-		enable: bool = True
+		enable: bool = True,
 	):
 		if enable is False or self.all_plot_enable is False:
 			return
@@ -120,7 +118,7 @@ class MujocoPlotter:
 			y_limit=[(-3.5, 3.5)],
 			legs=legs,
 			joint_names=joint_names,
-			window_size=window_size
+			window_size=window_size,
 		)
 
 	def jointvel_plot(
@@ -156,6 +154,42 @@ class MujocoPlotter:
 			joint_names=[' '],
 			window_size=window_size,
 		)
+	
+	def lin_acc_plot(
+			self,
+			axis: list=None,
+			window_size: int = 50,
+			enable: bool = True,):
+		if(enable is False or self.all_plot_enable is False):
+			return
+
+		if(axis is None): axis = self.axis
+
+		_, self.lin_acc = self.predefined_plot(
+			name='LinAcc',
+			y_limit=[(-5, 13)],
+			legs=["trunk"],
+			joint_names=axis,
+			window_size=window_size,
+		)
+
+	def ang_vel_plot(
+			self,
+			axis: list=None,
+			window_size: int = 50,
+			enable: bool = True,):
+		if(enable is False or self.all_plot_enable is False):
+			return
+
+		if(axis is None): axis = self.axis
+
+		_, self.ang_vel = self.predefined_plot(
+			name='AngVel',
+			y_limit=[(-5, 5)],
+			legs=["Trunk"],
+			joint_names=axis,
+			window_size=window_size,
+		)
 
 	def predefine_update(self, name, data, selected_legs, selected_joints, legs_attr=False):
 		if legs_attr:
@@ -176,6 +210,9 @@ class MujocoPlotter:
 		elif len(data) == 4:
 			# Data corresponds to [FL,FR,RL,RR]
 			filtered_values = [data[i] for i, leg in enumerate(self.legs) if leg in selected_legs]
+		elif len(data) == 3:
+			# Data corresponds to [X,Y,Z]
+			filtered_values = [data[i] for i, axis in enumerate(self.axis) if axis in selected_legs]
 
 		self.plots[name].send_data(filtered_values)
 
@@ -190,6 +227,12 @@ class MujocoPlotter:
 
 	def contact_update(self, contacts, LegsAttr=False):
 		self.predefine_update('FootContacts', contacts, self.contact_legs, [], legs_attr=LegsAttr)
+	
+	def lin_acc_update(self, lin_acc):
+		self.predefine_update('LinAcc', lin_acc, self.lin_acc, [] ,legs_attr=False)
+	
+	def ang_vel_update(self, ang_vel):
+		self.predefine_update('AngVel', ang_vel, self.ang_vel, [] ,legs_attr=False)
 
 	def update_plot(self):
 		for plot in self.plots.values():
@@ -213,14 +256,14 @@ class MultiLivePlotter(mp.Process):
 	def __init__(
 		self,
 		figure_name,
+		num_subplots=2,
 		window_size=50,
 		subplot_titles=None,
 		x_limits=None,
 		y_limits=None,
 		nrows=1,
-		ncols=1,
+		ncols=None,
 		y_margin=0.1,
-		plot_per_ax=1
 	):
 		"""
 		A live plotter that can handle multiple subplots, each with its own sliding window.
@@ -234,21 +277,18 @@ class MultiLivePlotter(mp.Process):
 		:param ncols:          Number of columns in the subplot layout (default auto-calculated).
 		"""
 		super(MultiLivePlotter, self).__init__()
-
-		if(plot_per_ax > 1 and nrows==1 and ncols == 1):
-			self.num_subplots=1
-			self.nBuffers = plot_per_ax
-		else:
-			self.num_subplots = nrows *ncols
-			self.nBuffers = self.num_subplots
-
+		self.num_subplots = num_subplots
 		self.window_size = window_size
 
 		self.queue = mp.Queue()  # Queue to receive data from simulator process
 		self.running = mp.Event()  # Control flag to stop the process safely
 
 		# Each subplot gets its own deque for data storage
-		self.data_buffers = [deque(maxlen=self.window_size) for _ in range(self.nBuffers)]
+		self.data_buffers = [deque(maxlen=self.window_size) for _ in range(num_subplots)]
+
+		# Determine the number of columns if not set
+		if ncols is None:
+			ncols = (num_subplots + nrows - 1) // nrows  # Auto-calculate to fit all subplots
 
 		self.nrows = nrows
 		self.ncols = ncols
@@ -286,7 +326,6 @@ class MultiLivePlotter(mp.Process):
 		# plt.ion()
 		self.fig, axs = plt.subplots(self.nrows, self.ncols, figsize=(10, 6))
 		self.axs = axs.flatten() if isinstance(axs, (list, np.ndarray)) else [axs]
-		
 
 		# Set figure title
 		# self.fig.suptitle(self.fig_name)  # Display figure title
@@ -299,28 +338,25 @@ class MultiLivePlotter(mp.Process):
 			self.subplot_titles += [f'Data {i + 1}' for i in range(len(self.subplot_titles), self.num_subplots)]
 
 		# Create line objects for each subplot
-		self.data_buffers = [deque(maxlen=self.window_size) for _ in range(self.nBuffers)]
+		self.data_buffers = [deque(maxlen=self.window_size) for _ in range(self.num_subplots)]
 		self.lines = []
 
-		for i in range(self.nBuffers):
-			if self.nBuffers > self.num_subplots: j=0
-			else: j=i			
-
-			(line,) = self.axs[j].plot([], [], label=self.subplot_titles[j])
+		for i in range(self.num_subplots):
+			(line,) = self.axs[i].plot([], [], label=self.subplot_titles[i])
 			self.lines.append(line)
 
-			self.axs[j].set_title(self.subplot_titles[j])
+			self.axs[i].set_title(self.subplot_titles[i])
 
 			# Apply user-defined x and y limits
 			if self.x_limits and i < len(self.x_limits):
-				self.axs[j].set_xlim(*self.x_limits[j])
+				self.axs[i].set_xlim(*self.x_limits[i])
 
 			if self.y_limits and i < len(self.y_limits):
-				self.axs[j].set_ylim(*self.y_limits[j])
+				self.axs[i].set_ylim(*self.y_limits[i])
 			else:
-				self.axs[j].autoscale()
+				self.axs[i].autoscale()
 
-			self.axs[j].legend(loc='upper left')
+			self.axs[i].legend(loc='upper left')
 
 		# Hide unused subplots
 		for i in range(self.num_subplots, len(self.axs)):
@@ -336,28 +372,27 @@ class MultiLivePlotter(mp.Process):
 		"""
 		if not self.queue.empty():
 			new_values = self.queue.get()
-			self._update_data(new_values)
+			self.update_data(new_values)
 
-		return self._update_plot()
+		return self.update_plot()
 
-	def _update_data(self, new_values):
+	def update_data(self, new_values):
 		"""
 		Update the sliding windows with new data for each subplot.
 		The order of the input is important, it will direct the values to their
 		specific plot
 		"""
-		if(self.num_subplots>1):
-			assert len(new_values) == self.num_subplots, f'Expected {self.num_subplots} values, got {len(new_values)}.'
+		assert len(new_values) == self.num_subplots, f'Expected {self.num_subplots} values, got {len(new_values)}.'
 
 		for i, val in enumerate(new_values):
 			self.data_buffers[i].append(val)
 
-	def _update_plot(self):
+	def update_plot(self):
 		"""
 		Refresh the plots with the updated sliding window data.
 		"""
 		updated_lines = []
-		for i in range(self.nBuffers):
+		for i in range(self.num_subplots):
 			x_data = np.arange(len(self.data_buffers[i]))
 			y_data = list(self.data_buffers[i])
 
@@ -384,14 +419,13 @@ class MultiLivePlotter(mp.Process):
 
 		return updated_lines
 
-	def plot_data(self, new_values):
+	def send_data(self, new_values):
 		"""
 		Send new data to the plotter process.
 
 		:param new_values: A list of new data points.
 		"""
 		if self.running.is_set():
-			if(not isinstance(new_values,list)): new_values = [new_values] 
 			try:
 				if self.queue.qsize() >= self.window_size:
 					# Maintain sliding window effect by removing the oldest item
@@ -427,7 +461,7 @@ class MultiLivePlotter(mp.Process):
 if __name__ == '__main__':
 	# Example usage: 2 subplots, window size of 50
 	# Titles, X-limits, and Y-limits for each subplot
-	titles = ['Random Stream A']#, 'Random Stream B']
+	titles = ['Random Stream A', 'Random Stream B']
 	x_lims = [(0, 50), (0, 50)]
 	y_lims = [(0, 2), (0, 1)]  # Different Y ranges for demonstration
 
@@ -436,10 +470,9 @@ if __name__ == '__main__':
 		figure_name='example',
 		subplot_titles=titles,
 		rows=1,
-		cols=1,
+		cols=2,
 		y_limits=y_lims,
 		window_size=50,
-		plots_per_ax=2
 	)
 	plotter.start()
 
@@ -450,6 +483,6 @@ if __name__ == '__main__':
 		new_val_subplot2 = random.random()
 
 		# Update the sliding windows
-		plotter.plots['example'].plot_data([new_val_subplot1, new_val_subplot2])
+		plotter.plots['example'].send_data([new_val_subplot1, new_val_subplot2])
 
 	plotter.stop()
