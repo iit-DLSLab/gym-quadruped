@@ -90,7 +90,7 @@ def load_dict_from_h5(h5group):
 
 
 class H5Writer:
-	def __init__(self, file_path, env: QuadrupedEnv):
+	def __init__(self, file_path, env: QuadrupedEnv, extra_obs: dict[str, tuple[int]] = None):
 		"""
 		Initialize the H5Writer object.
 
@@ -109,8 +109,8 @@ class H5Writer:
 			# Create a group for recordings
 			recordings = hf.create_group('recordings')
 
-			# Create dataset for each data type (proprioceptive)
 			recordings.create_dataset('time', shape=(0, 0, 1), maxshape=(None, None, 1), dtype='float64')
+			# Create dataset for each data type (proprioceptive)
 			for key, space in env.observation_space.spaces.items():
 				shape = (0, 0) + space.shape  # Trajectory/Episode id, time, obs_shape
 				max_shape = (None, None) + space.shape  # Trajectory/Episode id, time, obs_shape
@@ -119,6 +119,12 @@ class H5Writer:
 			shape = (0, 0) + env.action_space.shape  # Trajectory/Episode id, time, action_shape
 			max_shape = (None, None) + env.action_space.shape  # Trajectory/Episode id, time, action_shape
 			recordings.create_dataset('action', shape=shape, maxshape=max_shape, dtype='float64')
+			# Custom observations
+			if extra_obs:
+				for key, obs_shape in extra_obs.items():
+					shape = (0, 0) + obs_shape  # Trajectory/Episode id, time, obs_shape
+					max_shape = (None, None) + obs_shape  # Trajectory/Episode id, time, obs_shape
+					recordings.create_dataset(key, shape=shape, maxshape=max_shape, dtype='float64')
 
 	def append_trajectory(self, state_obs_traj: dict[str, np.ndarray], time: np.ndarray):
 		"""

@@ -17,7 +17,7 @@ from scipy.spatial.transform import Rotation
 from typing_extensions import deprecated
 
 from gym_quadruped.sensors.base_sensor import Sensor
-from gym_quadruped.utils.math_utils import angle_between_vectors, homogenous_transform
+from gym_quadruped.utils.math_utils import _process_range, angle_between_vectors, homogenous_transform
 from gym_quadruped.utils.mujoco.terrain import add_world_of_boxes, add_world_of_pyramid
 from gym_quadruped.utils.mujoco.visual import (
 	change_robot_appearance,
@@ -134,17 +134,9 @@ class QuadrupedEnv(gym.Env):
 		self.hip_height = hip_height
 
 		self.base_vel_command_type = base_vel_command_type
-		self.base_lin_vel_range = (
-			ref_base_lin_vel if isinstance(ref_base_lin_vel, tuple) else (ref_base_lin_vel, ref_base_lin_vel)
-		)
-		self.base_ang_vel_range = (
-			ref_base_ang_vel if isinstance(ref_base_ang_vel, tuple) else (ref_base_ang_vel, ref_base_ang_vel)
-		)
-		self.ground_friction_coeff_range = (
-			ground_friction_coeff
-			if isinstance(ground_friction_coeff, tuple)
-			else (ground_friction_coeff, ground_friction_coeff)
-		)
+		self.base_lin_vel_range = _process_range(ref_base_lin_vel)
+		self.base_ang_vel_range = _process_range(ref_base_ang_vel)
+		self.ground_friction_coeff_range = _process_range(ground_friction_coeff)
 		self.legs_order = legs_order
 
 		# Define the model and data _______________________________________________________________
@@ -255,18 +247,18 @@ class QuadrupedEnv(gym.Env):
 
 	def step(self, action) -> tuple[np.ndarray, float, bool, bool, dict]:
 		"""Apply the action to the robot, evolve the simulation, and return the observation, reward, and termination.
-git
-		Args:
-		----
-		    action: (np.ndarray) The desired joint-space torques to apply to each of the robot's DoF actuators.
+		git
+				Args:
+				----
+				    action: (np.ndarray) The desired joint-space torques to apply to each of the robot's DoF actuators.
 
-		Returns:
-		-------
-		    np.ndarray: The state observation.
-		    float: The reward.
-		    bool: Whether the episode is terminated.
-		    bool: Whether the episode is truncated.
-		    dict: Additional information.
+				Returns:
+				-------
+				    np.ndarray: The state observation.
+				    float: The reward.
+				    bool: Whether the episode is terminated.
+				    bool: Whether the episode is truncated.
+				    dict: Additional information.
 		"""
 		# Apply action (torque) to the robot
 		self.mjData.ctrl = action
@@ -407,10 +399,10 @@ git
 		# Reset the desired base velocity command
 		# ----------------------------------------------------------------------
 		if 'forward' in self.base_vel_command_type:
-			base_vel_norm = np.random.uniform(*self.base_lin_vel_range)
+			base_vel_norm = np.random.uniform(*self.base_lin_vel_range, size=1)
 			base_heading_vel_vec = np.array([1, 0, 0])  # Move in the "forward" direction
 		elif 'random' in self.base_vel_command_type:
-			base_vel_norm = np.random.uniform(*self.base_lin_vel_range)
+			base_vel_norm = np.random.uniform(*self.base_lin_vel_range, size=1)
 			heading_angle = np.random.uniform(-np.pi, np.pi)
 			base_heading_vel_vec = np.array([np.cos(heading_angle), np.sin(heading_angle), 0])
 		elif 'human' in self.base_vel_command_type:
