@@ -19,7 +19,8 @@ class MujocoPlotter:
 
 		self.legs = ['FL', 'FR', 'RL', 'RR']
 		self.joint_names = ['HAA', 'HFE', 'KFE']
-		self.predefined_plots = ['Torque', 'JointPos', 'JointVel', 'FootContacts']
+		self.predefined_plots = ['Torque', 'JointPos', 'JointVel', 'FootContacts', 'LinAcc', 'AngVel']
+		self.axis = ['X', 'Y', 'Z']
 
 		self.all_plot_enable = enable
 
@@ -31,6 +32,8 @@ class MujocoPlotter:
 		rows: int = 1,
 		cols: int = 1,
 		window_size: int = 50,
+		plots_per_ax:int=1
+
 	):
 		"""
 		Create new Plot figure
@@ -46,6 +49,8 @@ class MujocoPlotter:
 			window_size=window_size,
 			x_limits=[(0, window_size)] * (rows * cols),
 			y_limits=y_limits * (rows * cols),
+			plot_per_ax=plots_per_ax
+
 		)
 		self.plots[figure_name] = plotter
 
@@ -76,7 +81,6 @@ class MujocoPlotter:
 			for joint_name in joint_names:
 				cols += 1
 				titles += [f'{name} {leg}_{joint_name}']
-
 		self.create(
 			figure_name=name,
 			rows=rows,
@@ -98,7 +102,7 @@ class MujocoPlotter:
 			return
 		self.torque_legs, self.torque_joint_names = self.predefined_plot(
 			name='Torque',
-			y_limit=[(-35, 35)],
+			y_limit=[(-120, 120)],
 			legs=legs,
 			joint_names=joint_names,
 			window_size=window_size,
@@ -154,6 +158,42 @@ class MujocoPlotter:
 			joint_names=[' '],
 			window_size=window_size,
 		)
+	
+	def lin_acc_plot(
+			self,
+			axis: list=None,
+			window_size: int = 50,
+			enable: bool = True,):
+		if(enable is False or self.all_plot_enable is False):
+			return
+
+		if(axis is None): axis = self.axis
+
+		_, self.lin_acc = self.predefined_plot(
+			name='LinAcc',
+			y_limit=[(-5, 13)],
+			legs=["trunk"],
+			joint_names=axis,
+			window_size=window_size,
+		)
+
+	def ang_vel_plot(
+			self,
+			axis: list=None,
+			window_size: int = 50,
+			enable: bool = True,):
+		if(enable is False or self.all_plot_enable is False):
+			return
+
+		if(axis is None): axis = self.axis
+
+		_, self.ang_vel = self.predefined_plot(
+			name='AngVel',
+			y_limit=[(-5, 5)],
+			legs=["Trunk"],
+			joint_names=axis,
+			window_size=window_size,
+		)
 
 	def predefine_update(self, name, data, selected_legs, selected_joints, legs_attr=False):
 		if legs_attr:
@@ -174,6 +214,9 @@ class MujocoPlotter:
 		elif len(data) == 4:
 			# Data corresponds to [FL,FR,RL,RR]
 			filtered_values = [data[i] for i, leg in enumerate(self.legs) if leg in selected_legs]
+		elif len(data) == 3:
+			# Data corresponds to [X,Y,Z]
+			filtered_values = [data[i] for i, axis in enumerate(self.axis) if axis in selected_legs]
 
 		self.plots[name].send_data(filtered_values)
 
@@ -188,6 +231,12 @@ class MujocoPlotter:
 
 	def contact_update(self, contacts, LegsAttr=False):
 		self.predefine_update('FootContacts', contacts, self.contact_legs, [], legs_attr=LegsAttr)
+	
+	def lin_acc_update(self, lin_acc):
+		self.predefine_update('LinAcc', lin_acc, self.lin_acc, [] ,legs_attr=False)
+	
+	def ang_vel_update(self, ang_vel):
+		self.predefine_update('AngVel', ang_vel, self.ang_vel, [] ,legs_attr=False)
 
 	def update_plot(self):
 		for plot in self.plots.values():
@@ -219,6 +268,8 @@ class MultiLivePlotter(mp.Process):
 		nrows=1,
 		ncols=None,
 		y_margin=0.1,
+		plot_per_ax=1
+
 	):
 		"""
 		A live plotter that can handle multiple subplots, each with its own sliding window.
@@ -232,18 +283,22 @@ class MultiLivePlotter(mp.Process):
 		:param ncols:          Number of columns in the subplot layout (default auto-calculated).
 		"""
 		super(MultiLivePlotter, self).__init__()
-		self.num_subplots = num_subplots
+
+
+		if(plot_per_ax > 1 and nrows==1 and ncols == 1):
+			self.num_subplots=1
+			self.nBuffers = plot_per_ax
+		else:
+			self.num_subplots = nrows *ncols
+			self.nBuffers = self.num_subplots
 		self.window_size = window_size
 
 		self.queue = mp.Queue()  # Queue to receive data from simulator process
 		self.running = mp.Event()  # Control flag to stop the process safely
 
 		# Each subplot gets its own deque for data storage
-		self.data_buffers = [deque(maxlen=self.window_size) for _ in range(num_subplots)]
 
-		# Determine the number of columns if not set
-		if ncols is None:
-			ncols = (num_subplots + nrows - 1) // nrows  # Auto-calculate to fit all subplots
+		self.data_buffers = [deque(maxlen=self.window_size) for _ in range(self.nBuffers)]
 
 		self.nrows = nrows
 		self.ncols = ncols
@@ -327,9 +382,8 @@ class MultiLivePlotter(mp.Process):
 		"""
 		if not self.queue.empty():
 			new_values = self.queue.get()
-			self.update_data(new_values)
-
-		return self.update_plot()
+			self._update_data(new_values)
+		return self._update_plot()
 
 	def update_data(self, new_values):
 		"""
@@ -337,17 +391,22 @@ class MultiLivePlotter(mp.Process):
 		The order of the input is important, it will direct the values to their
 		specific plot
 		"""
-		assert len(new_values) == self.num_subplots, f'Expected {self.num_subplots} values, got {len(new_values)}.'
+
+		if(self.num_subplots>1):
+			assert len(new_values) == self.num_subplots, f'Expected {self.num_subplots} values, got {len(new_values)}.'
 
 		for i, val in enumerate(new_values):
 			self.data_buffers[i].append(val)
 
-	def update_plot(self):
+	def _update_plot(self):
+
 		"""
 		Refresh the plots with the updated sliding window data.
 		"""
 		updated_lines = []
-		for i in range(self.num_subplots):
+
+		for i in range(self.nBuffers):
+
 			x_data = np.arange(len(self.data_buffers[i]))
 			y_data = list(self.data_buffers[i])
 
@@ -381,6 +440,8 @@ class MultiLivePlotter(mp.Process):
 		:param new_values: A list of new data points.
 		"""
 		if self.running.is_set():
+			if(not isinstance(new_values,list)): new_values = [new_values] 
+
 			try:
 				if self.queue.qsize() >= self.window_size:
 					# Maintain sliding window effect by removing the oldest item
@@ -416,7 +477,8 @@ class MultiLivePlotter(mp.Process):
 if __name__ == '__main__':
 	# Example usage: 2 subplots, window size of 50
 	# Titles, X-limits, and Y-limits for each subplot
-	titles = ['Random Stream A', 'Random Stream B']
+
+	titles = ['Random Stream A']#, 'Random Stream B']
 	x_lims = [(0, 50), (0, 50)]
 	y_lims = [(0, 2), (0, 1)]  # Different Y ranges for demonstration
 
@@ -439,5 +501,6 @@ if __name__ == '__main__':
 
 		# Update the sliding windows
 		plotter.plots['example'].send_data([new_val_subplot1, new_val_subplot2])
+
 
 	plotter.stop()
