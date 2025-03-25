@@ -10,7 +10,7 @@
   <default>
     <default class="mini_cheetah">
       <geom friction="0.6" margin="0.001" condim="1"/>
-      <joint axis="0 1 0" damping="2" armature="0.01" frictionloss="0.2"/>
+      <joint axis="0 1 0" damping="0.2" armature="0.01" frictionloss="0.2"/>
       <motor ctrlrange="-23.7 23.7"/>
       <default class="abduction">
         <joint axis="1 0 0" range="-10.0472 10.0472"/>
@@ -33,8 +33,6 @@
       <default class="collision">
         <geom group="3"/>
         <default class="foot">
-          <geom size="0.022" pos="-0.002 0 -0.213" priority="1" solimp="0.015 1 0.031" condim="6"
-            friction="0.8 0.02 0.01"/>
         </default>
       </default>
     </default>
@@ -74,7 +72,7 @@
             <geom class="collision" quat="3.26795e-07 0 1 0" type="mesh" mesh="mini_lower_link"/>
             
             <!-- FL foot collision -->
-            <geom class="collision" name="FL" size="0.015" pos="0 0 -0.18"/>
+            <geom class="collision" name="FL" size="0.025" pos="0 0 -0.18"/>
           
           </body>
         </body>
@@ -105,7 +103,7 @@
             <geom class="collision" quat="3.26795e-07 0 1 0" type="mesh" mesh="mini_lower_link"/>
             
             <!-- FR foot collision -->
-            <geom class="collision" name="FR" size="0.015" pos="0 0 -0.18"/>
+            <geom class="collision" name="FR" size="0.025" pos="0 0 -0.18"/>
           
           </body>
         </body>
@@ -136,7 +134,7 @@
             <geom class="collision" quat="3.26795e-07 0 1 0" type="mesh" mesh="mini_lower_link"/>
             
             <!-- RL foot collision mesh -->
-            <geom class="collision" name="RL" size="0.015" pos="0 0 -0.18"/>
+            <geom class="collision" name="RL" size="0.025" pos="0 0 -0.18"/>
           
           </body>
         </body>
@@ -167,7 +165,7 @@
             <geom class="collision" quat="3.26795e-07 0 1 0" type="mesh" mesh="mini_lower_link"/>
             
             <!-- RR foot collision -->
-            <geom class="collision" name="RR" size="0.015" pos="0 0 -0.18"/>
+            <geom class="collision" name="RR" size="0.025" pos="0 0 -0.18"/>
           
           </body>
         </body>
@@ -191,11 +189,11 @@
   </actuator>
 
   <keyframe>
-    <key name="home" qpos="0 0 0.27 1 0 0 0
-                          -0.0 -0.829  2.084
-                          0.0  -0.829  2.084
-                          -0.0 -0.829  2.084
-                          0.0  -0.829  2.084"/>
+  <key name="home" qpos="0 0 0.27 1 0 0 0                      
+                      -0.0 -2.2  1.3                      
+                      0.0  -2.2  1.3                      
+                      -0.0 0.9  1.3                      
+                      0.0  0.9  1.3"/>
   </keyframe>
 
 </mujoco>
