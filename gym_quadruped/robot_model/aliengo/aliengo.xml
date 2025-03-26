@@ -32,11 +32,11 @@
     </default>
 
     <asset>
-        <mesh name="trunk" file="trunk.stl" />
-        <mesh name="hip" file="hip.stl" />
-        <mesh name="thigh_mirror" file="thigh_mirror.stl" />
-        <mesh name="calf" file="calf.stl" />
-        <mesh name="thigh" file="thigh.stl" />
+        <mesh name="trunk" file="assets/trunk.stl" />
+        <mesh name="hip" file="assets/hip.stl" />
+        <mesh name="thigh_mirror" file="assets/thigh_mirror.stl" />
+        <mesh name="calf" file="assets/calf.stl" />
+        <mesh name="thigh" file="assets/thigh.stl" />
     </asset>
 
 

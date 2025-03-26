@@ -1,11 +1,23 @@
 from __future__ import annotations
 
+import contextlib
+import copy
+import itertools
+
+import pathlib
 import xml.etree.ElementTree as ET
-from pathlib import Path
+from os import PathLike
+from typing import Any
+from typing_extensions import deprecated
+from xml.etree import ElementTree as ET
 
 import cv2
+import mujoco
 import noise
 import numpy as np
+from gym_quadruped.utils.math_utils import angle_between_vectors, homogenous_transform
+from gym_quadruped.utils.mujoco.visual import change_robot_appearance, render_ghost_robot, render_vector
+from gym_quadruped.utils.quadruped_utils import configure_observation_space_representations, LegsAttr
 from scipy.spatial.transform import Rotation
 
 
@@ -23,8 +35,7 @@ def list_to_str(vec: list[float]) -> str:
 
 
 def add_perlin_heightfield(
-	asset: ET.Element,
-	worldbody: ET.Element,
+	model_file_path,
 	position: list[float] = (0.0, 0.0, 0.0),  # position
 	euler_xyz: list[float] = (0.0, 0.0, 0.0),  # attitude
 	size: list[float] = (1.0, 1.0),  # width and length of the generated field in meters
@@ -37,13 +48,12 @@ def add_perlin_heightfield(
 	perlin_persistence: float = 0.5,
 	perlin_lacunarity: float = 2.0,
 	output_hfield_image: str = 'height_field.png',
-) -> None:
+) -> [ET.ElementTree, [float, float]]:
 	"""
 	Adds a Perlin noise-based heightfield to the scene.
 
 	Args:
-	    asset (xml_et.Element): The asset element of the XML.
-	    worldbody (xml_et.Element): The worldbody element of the XML.
+			    model_file_path (str): Path to the MuJoCo model file.
 	    position (List[float]): Position of the heightfield [x, y, z].
 	    euler_xyz (List[float]): Euler angles for the heightfield orientation [roll, pitch, yaw].
 	    size (List[float]): Size of the heightfield [width, length].
@@ -62,11 +72,18 @@ def add_perlin_heightfield(
 	    - Persistence: Controls the amplitude decrease of higher octaves (e.g., 0.5 reduces amplitude by half).
 	    - Lacunarity: Controls the frequency increase of higher octaves (e.g., 2.0 doubles the frequency).
 
+	Returns:
+		[ET.ElementTree, [float, float]]: Scene XML containing the heightfield and the terrain limits in meters.
 	"""
 	# Ensure output directory exists
-	output_path = Path(__file__).resolve().parent / 'assets'
+	output_path = pathlib.Path(__file__).resolve().parent / 'assets'
 	assert output_path.exists(), f'Output path {output_path.absolute().resolve()} does not exist.'
 	file_path = (output_path / output_hfield_image).with_suffix('.png')
+
+	scene_env = ET.parse(model_file_path)
+	root = scene_env.getroot()
+	worldbody = root.find('worldbody')
+	asset = root.find('asset')
 
 	# Generating height field based on Perlin noise
 	terrain_image = np.zeros((img_height, image_width), dtype=np.uint8)
@@ -86,7 +103,7 @@ def add_perlin_heightfield(
 	hfield = ET.SubElement(asset, 'hfield')
 	hfield.attrib['name'] = 'perlin_hfield'
 	hfield.attrib['size'] = list_to_str([size[0] / 2.0, size[1] / 2.0, max_height, min_height])
-	hfield.attrib['file'] = str(output_path.resolve())
+	hfield.attrib['file'] = str(file_path.absolute().resolve())
 
 	geo = ET.SubElement(worldbody, 'geom')
 	geo.attrib['type'] = 'hfield'
@@ -95,6 +112,9 @@ def add_perlin_heightfield(
 	quat_xyzw = Rotation.from_euler('xyz', euler_xyz).as_quat(canonical=True)
 	quat_wxyz = np.roll(quat_xyzw, 1)
 	geo.attrib['quat'] = list_to_str(quat_wxyz)
+	geo.attrib['material'] = 'groundplane'  # Add the material attribute
+
+	return scene_env, (size[0]/2, size[1]/2)
 
 
 # Add Box to scene
@@ -149,7 +169,7 @@ def add_world_of_boxes(
 	if euler is None:
 		euler = [0.0, -0.0, 0.0]
 	if init_pos is None:
-		init_pos = [1.0, 0.0, 0.0]
+		init_pos = [0.0, 0.0, 0.0]
 	scene = ET.parse(model_file_path)
 	root = scene.getroot()
 	worldbody = root.find('worldbody')
@@ -263,3 +283,72 @@ def add_world_of_pyramid(
 		radius = 1.2 * np.sqrt(2 * (max_abs_y - center[1]) * (max_abs_y - center[1]))
 
 	return scene, radius, center
+
+
+# For info on contextlib, see https://docs.python.org/3/library/contextlib.html
+@contextlib.contextmanager
+def local_seed(seed):
+	state = np.random.get_state()
+	np.random.seed(seed)
+	try:
+		yield
+	finally:
+		np.random.set_state(state)
+
+
+def generate_terrain(
+	base_scene_env_path: pathlib.Path,
+	procedural_assets_path: pathlib.Path,
+	hip_height: float,
+	terrain_name: str = 'perlin',
+	seed=10,
+) -> [ET.ElementTree, [float, float]]:
+	with local_seed(seed):
+
+		if base_scene_env_path.exists():
+			scene_env = ET.parse(base_scene_env_path)
+			terrain_limits = (np.inf, np.inf)
+		else:  # Procedurally generated terrain types. Scaling to the robot's hip height.
+			base_scene_env_path = procedural_assets_path / 'scene_flat.xml'
+
+			if terrain_name == 'random_boxes':
+				scene_env, _, terrain_limits = add_world_of_boxes(
+					base_scene_env_path,
+					init_pos=[0, 0, 0.02],
+					euler=[0, 0, 0.0],
+					box_euler_rand=[0.1, 0.1, 2 * np.pi],
+					nums=[10, 10],
+					separation=[2 * hip_height, 2 * hip_height],
+					box_size=[2 * hip_height, 2 * hip_height, hip_height / 4],
+					box_size_rand=[0.5 * hip_height, 0.5 * hip_height, hip_height / 2],
+					random_roll_pitch=True,
+				)
+			elif terrain_name == 'random_pyramids':
+				scene_env, _, terrain_limits = add_world_of_pyramid(
+					base_scene_env_path,
+					init_pos=[0, 0, 0.02],
+					width=10 * hip_height,
+					max_heigth=10 * hip_height,
+					length=10 * hip_height,
+					stair_nums=(10 * hip_height) / (hip_height / 4),
+				)
+			elif terrain_name == 'perlin':
+				scene_env, terrain_limits = add_perlin_heightfield(
+					base_scene_env_path,
+					size=(hip_height * 100, hip_height * 100),
+					max_height=2 * hip_height,
+					min_height=0.005,
+					image_width=128,
+					img_height=128,
+					smooth=50,
+					perlin_octaves=5,
+					perlin_lacunarity=4.0,
+				)
+			elif terrain_name == 'flat':
+				scene_env = ET.parse(base_scene_env_path)
+				terrain_limits = (10000, 10000)
+			else:
+				raise ValueError(
+					f'Invalid scene name: {terrain_name}, available are: random_boxes, random_pyramids, perlin'
+				)
+	return scene_env, terrain_limits
