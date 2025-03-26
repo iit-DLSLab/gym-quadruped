@@ -304,7 +304,6 @@ def generate_terrain(
 	seed=10,
 ) -> [ET.ElementTree, [float, float]]:
 	with local_seed(seed):
-
 		if base_scene_env_path.exists():
 			scene_env = ET.parse(base_scene_env_path)
 			terrain_limits = (np.inf, np.inf)
