@@ -6,6 +6,7 @@ import os
 from collections.abc import Callable
 from pathlib import Path
 from typing import Any
+import xml.etree.ElementTree as ET
 
 import gymnasium as gym
 import mujoco
@@ -14,20 +15,15 @@ import numpy as np
 from gymnasium import spaces
 from mujoco import MjData, MjModel
 from scipy.spatial.transform import Rotation
-from typing_extensions import deprecated
 
 from gym_quadruped.sensors.base_sensor import Sensor
-from gym_quadruped.utils.math_utils import _process_range, angle_between_vectors, homogenous_transform
-from gym_quadruped.utils.mujoco.terrain import add_world_of_boxes, add_world_of_pyramid
-from gym_quadruped.utils.mujoco.visual import (
-	change_robot_appearance,
-	render_ghost_robot,
-	render_vector,
-)
+from gym_quadruped.utils.math_utils import angle_between_vectors, homogenous_transform, _process_range
+from gym_quadruped.utils.mujoco.terrain import generate_terrain
+from gym_quadruped.utils.mujoco.visual import change_robot_appearance, render_ghost_robot, render_vector
 from gym_quadruped.utils.quadruped_utils import (
+	configure_observation_space_representations,
 	LegsAttr,
 	configure_observation_space,
-	configure_observation_space_representations,
 	extract_mj_joint_info,
 )
 
@@ -116,7 +112,7 @@ class QuadrupedEnv(gym.Env):
 		    ref_base_lin_vel: Magnitude of the desired/reference base linear velocity command. If a float, the
 		        velocity command is fixed. If a tuple, (min, max) the velocity command is uniformly sampled from this
 		    ref_base_ang_vel: Magnitude of the desired/reference base angular velocity (d yaw / dt) command.
-		        If a float, the velocity command is fixed. If a tuple, (min, max) the velocity command is uniformly
+		        Ithf a float, the velocity command is fixed. If a tuple, (min, max) the velocity command is uniformly
 		    ground_friction_coeff: Magnitude of the ground lateral friction coefficient. If a float, the friction
 		        coefficient is fixed. If a tuple, (min, max) the friction coefficient is uniformly sampled from this
 		    legs_order: (tuple) Default order of the legs in the state observation and action space. This order defines
@@ -143,42 +139,25 @@ class QuadrupedEnv(gym.Env):
 		# TODO: We should create a scene with the desired terrain and load the robot model (or multiple instances of the
 		#   robot models relying on robot_descriptions.py. This way of loading the XML is not ideal.
 		dir_path = os.path.dirname(os.path.realpath(__file__))
-		self.base_path = Path(dir_path) / 'robot_model' / robot
+		base_path = Path(dir_path) / 'robot_model' / robot
+		procedural_assets_path = Path(dir_path) / 'utils' / 'mujoco' / 'assets'
+		base_scene_env_path = base_path / f'scene_{scene}.xml'
+		scene_env, self.terrain_limits = generate_terrain(base_scene_env_path, procedural_assets_path, hip_height, scene, seed=10)
 
-		self.reset_env_counter = 0
-		self.scene_name = scene
-		self.terrain_radius = None
-		self.terrain_center = None
+		try:  # to load the robot's model on custom terrain scene.
+			root = scene_env.getroot()
+			# Add include of the robot model
+			robot_xml_path = base_path / f'{robot}.xml'
+			assert robot_xml_path.exists(), f'Robot model file not found: {robot_xml_path.absolute()}'
+			include = ET.Element('include')
+			include.attrib['file'] = str(robot_xml_path.absolute().resolve())
+			root.insert(0, include)
+			scene_env_path = procedural_assets_path / f'{robot}-{scene}.xml'
+			scene_env.write(scene_env_path)
 
-		# Random terrain generation # TODO: Automate terrain generation outside of the environment
-		if scene == 'random_boxes' or scene == 'random_pyramids':
-			self.model_file_path = self.base_path / 'scene_flat.xml'
-			if scene == 'random_boxes':
-				scene_env, self.terrain_radius, self.terrain_center = add_world_of_boxes(
-					self.model_file_path,
-					init_pos=[0.6, -1.5, 0.02],
-					euler=[0, 0, 0.0],
-					nums=[10, 10],
-					separation=[0.5, 0.5],
-				)
-			else:
-				scene_env, self.terrain_radius, self.terrain_center = add_world_of_pyramid(
-					self.model_file_path, init_pos=[3, 0, 0.02]
-				)
-
-			self.model_file_path = self.base_path / 'scene_new.xml'
-			scene_env.write(self.model_file_path)
-
-		else:
-			self.model_file_path = self.base_path / f'scene_{scene}.xml'
-			print(self.model_file_path)
-			assert self.model_file_path.exists(), f'Model file not found: {self.model_file_path.absolute().resolve()}'
-
-		# Load the robot and scene to mujoco
-		try:
-			self.mjModel: MjModel = mujoco.MjModel.from_xml_path(str(self.model_file_path))
+			self.mjModel: MjModel = mujoco.MjModel.from_xml_path(str(scene_env_path.absolute()))
 		except ValueError as e:
-			raise ValueError(f'Error loading the scene {self.model_file_path}:') from e
+			raise ValueError(f'Error loading the scene {scene_env_path}:') from e
 
 		self.mjData: MjData = mujoco.MjData(self.mjModel)
 		# MjData structure to compute and store the state of a ghost/transparent robot for visual rendering.
@@ -276,7 +255,7 @@ class QuadrupedEnv(gym.Env):
 
 		# Check if done (simplified, usually more complex)
 		invalid_contact, contact_info = self._check_for_invalid_contacts()
-		out_of_terrain_bounds = self._check_for_robot_out_of_terrain_bounds()
+		out_of_terrain_bounds = self._check_out_of_terrain_bounds()
 		is_terminated = invalid_contact or out_of_terrain_bounds  # and ...
 		is_truncated = False
 		# Info dictionary
@@ -328,43 +307,24 @@ class QuadrupedEnv(gym.Env):
 				self.mjData.qpos[7:] += np.random.uniform(-q_pos_amp, q_pos_amp, self.mjModel.nq - 7)
 				self.mjData.qvel[6:] += np.random.uniform(-q_vel_amp, q_vel_amp, self.mjModel.nv - 6)
 
-				if self.scene_name == 'random_boxes' or self.scene_name == 'random_pyramids':
-					# Random xy position within a circle of the random generated terrain
-					# Orientation pointing toward the center of the terrain
-					cx, cy = self.terrain_center
+				xy_pos = np.array([
+					np.random.uniform(-self.terrain_limits[0] * (3/4), self.terrain_limits[0] * (3/4)),
+					np.random.uniform(-self.terrain_limits[1] * (3/4), self.terrain_limits[1] * (3/4)),
+				])
+				self.mjData.qpos[0:2] = xy_pos
 
-					# Generate a random angle (in radians)
-					angle = np.random.uniform(0, 2 * np.pi)
-
-					# Calculate the x and y coordinates on the border of the circle
-					x_border = cx + self.terrain_radius * np.cos(angle)
-					y_border = cy + self.terrain_radius * np.sin(angle)
-
-					# Create the vector pointing to the center (cx, cy) from (x_border, y_border)
-					vector_world_to_border = np.array([x_border, y_border, 0])
-					vector_world_to_center = np.array([cx, cy, 0])
-
-					theta = angle_between_vectors(vector_world_to_border, vector_world_to_center)
-
-					ori_xyzw = Rotation.from_euler('xyz', [0, 0, theta]).as_quat(canonical=True)
-
-					self.mjData.qpos[0:2] = np.array([x_border, y_border], dtype=np.float32)
-				else:
-					# Random orientation
-					roll_sweep = 10 * np.pi / 180 if 'roll_sweep' not in options else options['roll_sweep']
-					pitch_sweep = 10 * np.pi / 180 if 'pitch_sweep' not in options else options['pitch_sweep']
-					ori_xyzw = Rotation.from_euler(
-						'xyz',
-						[
-							np.random.uniform(-roll_sweep, roll_sweep),
-							np.random.uniform(-pitch_sweep, pitch_sweep),
-							np.random.uniform(-np.pi, np.pi),
+				# Random orientation
+				roll_sweep = 10 * np.pi / 180 if 'roll_sweep' not in options else options['roll_sweep']
+				pitch_sweep = 10 * np.pi / 180 if 'pitch_sweep' not in options else options['pitch_sweep']
+				theta = angle_between_vectors([xy_pos[0], xy_pos[1], 0], [0, 0, 0])
+				ori_wxyz = Rotation.from_euler(
+					'xyz',
+					[
+						np.random.uniform(-roll_sweep, roll_sweep),
+						np.random.uniform(-pitch_sweep, pitch_sweep),
+						theta,
 						],
-					).as_quat(canonical=True)
-					# Random xy position withing a 2 x 2 square
-					self.mjData.qpos[0:2] = np.random.uniform(-2, 2, 2)
-
-				ori_wxyz = np.roll(ori_xyzw, 1)
+					).as_quat(scalar_first=True)
 				self.mjData.qpos[3:7] = ori_wxyz
 
 				try:
@@ -423,36 +383,6 @@ class QuadrupedEnv(gym.Env):
 		tangential_friction = np.random.uniform(*self.ground_friction_coeff_range)
 		self._set_ground_friction(tangential_coeff=tangential_friction)
 
-		"""# reset World----------------------------------------------
-        if(os.path.exists(self.model_file_path) and 
-           self.scene_name == "random_boxes" or self.scene_name == "random_pyramids"): 
-            self.model_file_path = self.base_path / f'scene_flat.xml'
-            if(self.scene_name == "random_boxes"):
-                scene_env = add_world_of_boxes(self.model_file_path,
-                                                    init_pos=[0.6, -1.5, 0.02],
-                                                    euler=[0, 0, 0.0],
-                                                    nums=[10, 10],
-                                                    separation=[0.5, 0.5])
-            elif(self.scene_name == "random_pyramids"):
-                scene_env = add_world_of_pyramid(self.model_file_path, init_pos=[3, 0, 0.02])
-
-            self.model_file_path = self.base_path / f'scene_new.xml'
-            scene_env.write(self.model_file_path)
-
-            #Load the robot and scene to mujoco
-            try:
-                self.mjModel: MjModel = mujoco.MjModel.from_xml_path(str(self.model_file_path))
-                self.mjData: MjData = mujoco.MjData(self.mjModel)
-                mujoco.mj_resetDataKeyframe(self.mjModel, self.mjData, 0)
-                # MjData structure to compute and store the state of a ghost/transparent robot for visual rendering.
-                self._ghost_mjData: MjData = mujoco.MjData(self.mjModel)
-                self.close()
-                self.render()
-            except ValueError as e:
-                raise ValueError(f"Error loading the scene {self.model_file_path}:") from e
-        #-------------------------------------------------------------- """
-
-		self.reset_env_counter += 1
 		return self._get_obs()
 
 	def render(self, mode='human', tint_robot=False, ghost_qpos=None, ghost_alpha=0.5):
@@ -949,23 +879,6 @@ class QuadrupedEnv(gym.Env):
 		)
 		return obs_reps
 
-	@deprecated('state observation is already a gym.spaces.Dict instance since version 0.0.8')
-	def extract_obs_from_state(self, state_like_array: np.ndarray) -> dict[str, np.ndarray]:
-		"""Extracts the state observation from a state-like array.
-
-		Parameters
-		----------
-		state_like_array : np.ndarray
-		    The state-like array to extract the state observation from. The shape of
-		    the array should be (..., self.observation_space.shape).
-
-		Returns
-		-------
-		state_obs_dict: (dict) A dictionary with the state observation names as keys and the corresponding
-		    state observation values as values.
-		"""
-		raise DeprecationWarning('state observation is already a gym.spaces.Dict instance since version 0.0.8')
-
 	def _compute_reward(self):
 		# Example reward function (to be defined based on the task)
 		# Reward could be based on distance traveled, energy efficiency, etc.
@@ -1061,14 +974,9 @@ class QuadrupedEnv(gym.Env):
 
 		return invalid_contact_detected, invalid_contacts  # No invalid contact detected
 
-	def _check_for_robot_out_of_terrain_bounds(self) -> bool:
+	def _check_out_of_terrain_bounds(self) -> bool:
 		"""Env termination occurs when the robot is outside the environment."""
-		if self.scene_name == 'random_boxes' or self.scene_name == 'random_pyramids':
-			distance_robot_to_center = np.linalg.norm(self.base_pos[:2] - self.terrain_center)
-			if distance_robot_to_center > self.terrain_radius * 1.3:
-				return True
-		else:
-			return False
+		return np.abs(self.base_pos[0]) > self.terrain_limits[0] or np.abs(self.base_pos[1]) > self.terrain_limits[1]
 
 	def _get_geom_body_info(self, geom_name: str = None, geom_id: int = None) -> [int, str]:
 		"""Returns the body ID and name associated with the geometry name or ID."""

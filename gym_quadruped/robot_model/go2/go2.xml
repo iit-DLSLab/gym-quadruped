@@ -42,22 +42,22 @@
     <material name="white" rgba="1 1 1 1"/>
     <material name="gray" rgba="0.671705 0.692426 0.774270 1"/>
 
-    <mesh file="base_0.obj"/>
-    <mesh file="base_1.obj"/>
-    <mesh file="base_2.obj"/>
-    <mesh file="base_3.obj"/>
-    <mesh file="base_4.obj"/>
-    <mesh file="hip_0.obj"/>
-    <mesh file="hip_1.obj"/>
-    <mesh file="thigh_0.obj"/>
-    <mesh file="thigh_1.obj"/>
-    <mesh file="thigh_mirror_0.obj"/>
-    <mesh file="thigh_mirror_1.obj"/>
-    <mesh file="calf_0.obj"/>
-    <mesh file="calf_1.obj"/>
-    <mesh file="calf_mirror_0.obj"/>
-    <mesh file="calf_mirror_1.obj"/>
-    <mesh file="foot.obj"/>
+    <mesh file="assets/base_0.obj"/>
+    <mesh file="assets/base_1.obj"/>
+    <mesh file="assets/base_2.obj"/>
+    <mesh file="assets/base_3.obj"/>
+    <mesh file="assets/base_4.obj"/>
+    <mesh file="assets/hip_0.obj"/>
+    <mesh file="assets/hip_1.obj"/>
+    <mesh file="assets/thigh_0.obj"/>
+    <mesh file="assets/thigh_1.obj"/>
+    <mesh file="assets/thigh_mirror_0.obj"/>
+    <mesh file="assets/thigh_mirror_1.obj"/>
+    <mesh file="assets/calf_0.obj"/>
+    <mesh file="assets/calf_1.obj"/>
+    <mesh file="assets/calf_mirror_0.obj"/>
+    <mesh file="assets/calf_mirror_1.obj"/>
+    <mesh file="assets/foot.obj"/>
   </asset>
 
   <worldbody>

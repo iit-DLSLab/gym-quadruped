@@ -18,3 +18,5 @@ output/
 .vscode/
 
 *.pkl
+/gym_quadruped/utils/mujoco/assets/
+
