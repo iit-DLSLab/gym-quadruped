@@ -256,7 +256,7 @@ def add_world_of_pyramid(
 	local_pos = [0.0, 0.0, -0.05]
 	height_rand = np.random.uniform(0.08, max_height, 1)
 	stride_rand = np.random.uniform(0.5, 1.0, 1)
-	for i in range(stair_nums):
+	for i in range(int(stair_nums)):
 		local_pos[2] += height_rand[0]
 		x, y, _ = Rotation.from_euler('xyz', [0, 0, yaw]).as_matrix() @ local_pos
 		new_width = width - stride_rand[0] * i
@@ -314,7 +314,7 @@ def generate_terrain(
 			if terrain_name == 'random_boxes':
 				scene_env, _, terrain_limits = add_world_of_boxes(
 					base_scene_env_path,
-					init_pos=[0, 0, 0.02],
+					init_pos=[0.5, -3.0, 0.02],
 					euler=[0, 0, 0.0],
 					box_euler_rand=[0.1, 0.1, 2 * np.pi],
 					nums=[10, 10],
@@ -326,9 +326,9 @@ def generate_terrain(
 			elif terrain_name == 'random_pyramids':
 				scene_env, _, terrain_limits = add_world_of_pyramid(
 					base_scene_env_path,
-					init_pos=[0, 0, 0.02],
+					init_pos=[3, 0, 0.02],
 					width=10 * hip_height,
-					max_heigth=10 * hip_height,
+					max_height=10 * hip_height,
 					length=10 * hip_height,
 					stair_nums=(10 * hip_height) / (hip_height / 4),
 				)
