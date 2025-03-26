@@ -47,7 +47,7 @@ def angle_between_vectors(vector1: np.ndarray, vector2: np.ndarray) -> float:
     magnitude_vector1 = np.linalg.norm(vector1)
     magnitude_vector2 = np.linalg.norm(vector2)
     return np.arccos(dot_product / (magnitude_vector1 * magnitude_vector2))"""
-	vector_diff = vector2 - vector1
+	vector_diff = np.asarray(vector2) - vector1
 	return np.arctan2(vector_diff[1], vector_diff[0])
 
 

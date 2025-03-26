@@ -18,3 +18,8 @@ output/
 .vscode/
 
 *.pkl
+/gym_quadruped/utils/mujoco/assets/*perlin.xml
+/gym_quadruped/utils/mujoco/assets/*-flat.xml
+/gym_quadruped/utils/mujoco/assets/height_field.png
+/gym_quadruped/utils/mujoco/assets/*random*.xml
+
