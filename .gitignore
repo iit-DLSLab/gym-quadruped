@@ -23,3 +23,6 @@ output/
 /gym_quadruped/utils/mujoco/assets/height_field.png
 /gym_quadruped/utils/mujoco/assets/*random*.xml
 
+/gym_quadruped/utils/mujoco/assets/*
+!/gym_quadruped/utils/mujoco/assets/scene_flat.xml
+
