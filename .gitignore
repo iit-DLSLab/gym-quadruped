@@ -18,5 +18,7 @@ output/
 .vscode/
 
 *.pkl
-/gym_quadruped/utils/mujoco/assets/
+
+/gym_quadruped/utils/mujoco/assets/*
+!/gym_quadruped/utils/mujoco/assets/scene_flat.xml
 
