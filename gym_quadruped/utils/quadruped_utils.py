@@ -352,8 +352,14 @@ def configure_observation_space_representations(
 	rep_SO3_flat.name = 'SO3_flat'
 
 	# Create a representation for the z dimension alone of the base position
-	rep_z = G.irrep(*rep_Rd.irreps[-1])
-
+	rep_z = escnn_representation_form_mapping(G, {g: rep_Rd(g)[2:3, 2:3] for g in G.elements}, name='base_z')
+	rep_roll = escnn_representation_form_mapping(
+		G, {g: rep_Rd_pseudo(g)[0:1, 0:1] for g in G.elements}, name='base_roll'
+	)
+	rep_pitch = escnn_representation_form_mapping(
+		G, {g: rep_Rd_pseudo(g)[1:2, 1:2] for g in G.elements}, name='base_pitch'
+	)
+	rep_yaw = escnn_representation_form_mapping(G, {g: rep_Rd_pseudo(g)[2:3, 2:3] for g in G.elements}, name='base_yaw')
 	obs_reps = {k: None for k in obs_names}
 	for obs_name in obs_names:
 		# Generalized position, velocity, and force (torque) spaces

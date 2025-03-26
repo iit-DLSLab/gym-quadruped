@@ -9,7 +9,7 @@
 
         <light castshadow="false" diffuse="1 1 1"/>
         <camera fovy="60"/>
-        <joint damping="3" armature="0.01" frictionloss="0.2" />
+        <joint damping="0.6" armature="0.01" frictionloss="0.2" />
         
         
         <default class="visual">
@@ -32,11 +32,11 @@
     </default>
 
     <asset>
-        <mesh name="trunk" file="trunk.stl" />
-        <mesh name="hip" file="hip.stl" />
-        <mesh name="thigh_mirror" file="thigh_mirror.stl" />
-        <mesh name="calf" file="calf.stl" />
-        <mesh name="thigh" file="thigh.stl" />
+        <mesh name="trunk" file="assets/trunk.stl" />
+        <mesh name="hip" file="assets/hip.stl" />
+        <mesh name="thigh_mirror" file="assets/thigh_mirror.stl" />
+        <mesh name="calf" file="assets/calf.stl" />
+        <mesh name="thigh" file="assets/thigh.stl" />
     </asset>
 
 
@@ -181,7 +181,7 @@
                         <geom type="box" class="collision" size="0.125 0.0104 0.008" pos="0 0 -0.125" quat="0.707107 0 0.707107 0"/>
                         
                         <!-- RR_foot only collision -->
-                        <geom name="RR" class="collision" size="0.0265" pos="0 0 -0.25" rgba="0 0 0 0"/>
+                        <geom name="RR" class="collision" size="0.0265" pos="0 0 -0.25"/>
                     </body>
                 </body>
             </body>

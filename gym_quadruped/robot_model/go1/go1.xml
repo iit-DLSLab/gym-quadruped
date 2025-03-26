@@ -6,7 +6,7 @@
   <default>
     <default class="go1">
       <geom friction="0.6" margin="0.001" condim="1"/>
-      <joint axis="0 1 0" damping="2" armature="0.01" frictionloss="0.2"/>
+      <joint axis="0 1 0" damping="0.6" armature="0.01" frictionloss="0.2"/>
       <position kp="100" forcerange="-23.7 23.7"/>
       <default class="abduction">
         <joint axis="1 0 0" damping="1" range="-0.863 0.863"/>
@@ -68,11 +68,11 @@
 
   <asset>
     <material name="dark" rgba="0.1 0.1 0.1 1"/>
-    <mesh class="go1" file="trunk.stl"/>
-    <mesh class="go1" file="hip.stl"/>
-    <mesh class="go1" file="thigh_mirror.stl"/>
-    <mesh class="go1" file="calf.stl"/>
-    <mesh class="go1" file="thigh.stl"/>
+    <mesh class="go1" file="assets/trunk.stl"/>
+    <mesh class="go1" file="assets/hip.stl"/>
+    <mesh class="go1" file="assets/thigh_mirror.stl"/>
+    <mesh class="go1" file="assets/calf.stl"/>
+    <mesh class="go1" file="assets/thigh.stl"/>
   </asset>
 
   <worldbody>
