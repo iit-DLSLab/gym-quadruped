@@ -677,6 +677,66 @@ class QuadrupedEnv(gym.Env):
 
 		return feet_trans_jac if not return_rot_jac else (feet_trans_jac, feet_rot_jac)
 
+
+	def feet_jacobians_dot(self, frame: str = 'world', return_rot_jac: bool = False) -> LegsAttr | tuple[LegsAttr, ...]:
+		"""Compute the Jacobians derivative of the feet positions.
+
+		This function computes the translational and rotational Jacobians derivative of the feet positions. Each feet position is
+		defined as the position of the geometry corresponding to each foot, passed in the `feet_geom_name` argument of
+		the constructor. The body to which each feet point/geometry is attached to is assumed to be the one passed in
+		the `feet_body_name` argument of the constructor.
+
+
+		Args:
+		----
+		    frame: Either 'world' or 'base'. The reference frame in which the Jacobians are computed.
+		    return_rot_jac: Whether to compute the rotational Jacobians. If False, only the translational Jacobians
+		        are computed.
+
+		Returns:
+		-------
+		    If `return_rot_jac` is False:
+		    LegsAttr: A dictionary-like object with:
+		        - FR: (3, mjModel.nv) Jacobian of the FR foot position in the specified frame.
+		        - FL: (3, mjModel.nv) Jacobian of the FL foot position in the specified frame.
+		        - RR: (3, mjModel.nv) Jacobian of the RR foot position in the specified frame.
+		        - RL: (3, mjModel.nv) Jacobian of the RL foot position in the specified frame.
+		    If `return_rot_jac` is True:
+		    tuple: A tuple with two LegsAttr objects:
+		        - The first LegsAttr object contains the translational Jacobians as described above.
+		        - The second LegsAttr object contains the rotational Jacobians.
+		"""
+		if any(x is None for x in self._feet_body_id.to_list()):
+			raise ValueError(
+				'Please provide the `feet_geom_name` argument in the Env constructor to compute feet Jacobians.'
+			)
+
+		if frame == 'world':
+			R = np.eye(3)
+		elif frame == 'base':
+			R = self.base_configuration[0:3, 0:3]
+		else:
+			raise ValueError(f"Invalid frame: {frame} != 'world' or 'base'")
+		feet_trans_jac_dot = LegsAttr(*[np.zeros((3, self.mjModel.nv)) for _ in range(4)])
+		feet_rot_jac_dot = LegsAttr(*[np.zeros((3, self.mjModel.nv)) if not return_rot_jac else None for _ in range(4)])
+		feet_pos = self.feet_pos(frame='world')  # Mujoco mj_jac expects the point in global coordinates.
+
+		for leg_name in ['FR', 'FL', 'RR', 'RL']:
+			mujoco.mj_jacDot(
+				m=self.mjModel,
+				d=self.mjData,
+				jacp=feet_trans_jac_dot[leg_name],
+				jacr=feet_rot_jac_dot[leg_name],
+				point=feet_pos[leg_name],  # Point in global coordinates
+				body=self._feet_body_id[leg_name],  # Body to which `point` is attached to.
+			)
+			feet_trans_jac_dot[leg_name] = R.T @ feet_trans_jac_dot[leg_name]
+			if return_rot_jac:
+				feet_rot_jac_dot[leg_name] = R.T @ feet_rot_jac_dot[leg_name]
+
+		return feet_trans_jac_dot if not return_rot_jac else (feet_trans_jac_dot, feet_rot_jac_dot)
+
+
 	def feet_contact_state(self, frame='world', ground_reaction_forces=False) -> [LegsAttr, LegsAttr]:
 		"""Returns the boolean contact state of the feet.
 

@@ -360,7 +360,7 @@ def configure_observation_space_representations(
 		G, {g: rep_Rd_pseudo(g)[1:2, 1:2] for g in G.elements}, name='base_pitch'
 	)
 	rep_yaw = escnn_representation_form_mapping(G, {g: rep_Rd_pseudo(g)[2:3, 2:3] for g in G.elements}, name='base_yaw')
-	obs_reps = {k: None for k in obs_names}
+	obs_reps = dict.fromkeys(obs_names)
 	for obs_name in obs_names:
 		# Generalized position, velocity, and force (torque) spaces
 		if obs_name == 'qpos':

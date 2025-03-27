@@ -1,23 +1,12 @@
 from __future__ import annotations
 
 import contextlib
-import copy
-import itertools
-
 import pathlib
 import xml.etree.ElementTree as ET
-from os import PathLike
-from typing import Any
-from typing_extensions import deprecated
-from xml.etree import ElementTree as ET
 
 import cv2
-import mujoco
 import noise
 import numpy as np
-from gym_quadruped.utils.math_utils import angle_between_vectors, homogenous_transform
-from gym_quadruped.utils.mujoco.visual import change_robot_appearance, render_ghost_robot, render_vector
-from gym_quadruped.utils.quadruped_utils import configure_observation_space_representations, LegsAttr
 from scipy.spatial.transform import Rotation
 
 
@@ -114,7 +103,7 @@ def add_perlin_heightfield(
 	geo.attrib['quat'] = list_to_str(quat_wxyz)
 	geo.attrib['material'] = 'groundplane'  # Add the material attribute
 
-	return scene_env, (size[0]/2, size[1]/2)
+	return scene_env, (size[0] / 2, size[1] / 2)
 
 
 # Add Box to scene
