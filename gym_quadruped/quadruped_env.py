@@ -3,10 +3,10 @@ from __future__ import annotations
 import copy
 import itertools
 import os
-import xml.etree.ElementTree as ET
 from collections.abc import Callable
 from pathlib import Path
 from typing import Any
+import xml.etree.ElementTree as ET
 
 import gymnasium as gym
 import mujoco
@@ -17,13 +17,13 @@ from mujoco import MjData, MjModel
 from scipy.spatial.transform import Rotation
 
 from gym_quadruped.sensors.base_sensor import Sensor
-from gym_quadruped.utils.math_utils import _process_range, angle_between_vectors, homogenous_transform
+from gym_quadruped.utils.math_utils import angle_between_vectors, homogenous_transform, _process_range
 from gym_quadruped.utils.mujoco.terrain import generate_terrain
 from gym_quadruped.utils.mujoco.visual import change_robot_appearance, render_ghost_robot, render_vector
 from gym_quadruped.utils.quadruped_utils import (
+	configure_observation_space_representations,
 	LegsAttr,
 	configure_observation_space,
-	configure_observation_space_representations,
 	extract_mj_joint_info,
 )
 
@@ -142,9 +142,7 @@ class QuadrupedEnv(gym.Env):
 		base_path = Path(dir_path) / 'robot_model' / robot
 		procedural_assets_path = Path(dir_path) / 'utils' / 'mujoco' / 'assets'
 		base_scene_env_path = base_path / f'scene_{scene}.xml'
-		scene_env, self.terrain_limits = generate_terrain(
-			base_scene_env_path, procedural_assets_path, hip_height, scene, seed=10
-		)
+		scene_env, self.terrain_limits = generate_terrain(base_scene_env_path, procedural_assets_path, hip_height, scene, seed=10)
 
 		try:  # to load the robot's model on custom terrain scene.
 			root = scene_env.getroot()
@@ -309,12 +307,10 @@ class QuadrupedEnv(gym.Env):
 				self.mjData.qpos[7:] += np.random.uniform(-q_pos_amp, q_pos_amp, self.mjModel.nq - 7)
 				self.mjData.qvel[6:] += np.random.uniform(-q_vel_amp, q_vel_amp, self.mjModel.nv - 6)
 
-				xy_pos = np.array(
-					[
-						np.random.uniform(-self.terrain_limits[0] * (3 / 4), self.terrain_limits[0] * (3 / 4)),
-						np.random.uniform(-self.terrain_limits[1] * (3 / 4), self.terrain_limits[1] * (3 / 4)),
-					]
-				)
+				xy_pos = np.array([
+					np.random.uniform(-self.terrain_limits[0] * (3/4), self.terrain_limits[0] * (3/4)),
+					np.random.uniform(-self.terrain_limits[1] * (3/4), self.terrain_limits[1] * (3/4)),
+				])
 				self.mjData.qpos[0:2] = xy_pos
 
 				# Random orientation
@@ -327,8 +323,8 @@ class QuadrupedEnv(gym.Env):
 						np.random.uniform(-roll_sweep, roll_sweep),
 						np.random.uniform(-pitch_sweep, pitch_sweep),
 						theta,
-					],
-				).as_quat(scalar_first=True)
+						],
+					).as_quat(scalar_first=True)
 				self.mjData.qpos[3:7] = ori_wxyz
 
 				try:
@@ -680,6 +676,66 @@ class QuadrupedEnv(gym.Env):
 				feet_rot_jac[leg_name] = R.T @ feet_rot_jac[leg_name]
 
 		return feet_trans_jac if not return_rot_jac else (feet_trans_jac, feet_rot_jac)
+
+
+	def feet_jacobians_dot(self, frame: str = 'world', return_rot_jac: bool = False) -> LegsAttr | tuple[LegsAttr, ...]:
+		"""Compute the Jacobians derivative of the feet positions.
+
+		This function computes the translational and rotational Jacobians derivative of the feet positions. Each feet position is
+		defined as the position of the geometry corresponding to each foot, passed in the `feet_geom_name` argument of
+		the constructor. The body to which each feet point/geometry is attached to is assumed to be the one passed in
+		the `feet_body_name` argument of the constructor.
+
+
+		Args:
+		----
+		    frame: Either 'world' or 'base'. The reference frame in which the Jacobians are computed.
+		    return_rot_jac: Whether to compute the rotational Jacobians. If False, only the translational Jacobians
+		        are computed.
+
+		Returns:
+		-------
+		    If `return_rot_jac` is False:
+		    LegsAttr: A dictionary-like object with:
+		        - FR: (3, mjModel.nv) Jacobian of the FR foot position in the specified frame.
+		        - FL: (3, mjModel.nv) Jacobian of the FL foot position in the specified frame.
+		        - RR: (3, mjModel.nv) Jacobian of the RR foot position in the specified frame.
+		        - RL: (3, mjModel.nv) Jacobian of the RL foot position in the specified frame.
+		    If `return_rot_jac` is True:
+		    tuple: A tuple with two LegsAttr objects:
+		        - The first LegsAttr object contains the translational Jacobians as described above.
+		        - The second LegsAttr object contains the rotational Jacobians.
+		"""
+		if any(x is None for x in self._feet_body_id.to_list()):
+			raise ValueError(
+				'Please provide the `feet_geom_name` argument in the Env constructor to compute feet Jacobians.'
+			)
+
+		if frame == 'world':
+			R = np.eye(3)
+		elif frame == 'base':
+			R = self.base_configuration[0:3, 0:3]
+		else:
+			raise ValueError(f"Invalid frame: {frame} != 'world' or 'base'")
+		feet_trans_jac_dot = LegsAttr(*[np.zeros((3, self.mjModel.nv)) for _ in range(4)])
+		feet_rot_jac_dot = LegsAttr(*[np.zeros((3, self.mjModel.nv)) if not return_rot_jac else None for _ in range(4)])
+		feet_pos = self.feet_pos(frame='world')  # Mujoco mj_jac expects the point in global coordinates.
+
+		for leg_name in ['FR', 'FL', 'RR', 'RL']:
+			mujoco.mj_jacDot(
+				m=self.mjModel,
+				d=self.mjData,
+				jacp=feet_trans_jac_dot[leg_name],
+				jacr=feet_rot_jac_dot[leg_name],
+				point=feet_pos[leg_name],  # Point in global coordinates
+				body=self._feet_body_id[leg_name],  # Body to which `point` is attached to.
+			)
+			feet_trans_jac_dot[leg_name] = R.T @ feet_trans_jac_dot[leg_name]
+			if return_rot_jac:
+				feet_rot_jac_dot[leg_name] = R.T @ feet_rot_jac_dot[leg_name]
+
+		return feet_trans_jac_dot if not return_rot_jac else (feet_trans_jac_dot, feet_rot_jac_dot)
+
 
 	def feet_contact_state(self, frame='world', ground_reaction_forces=False) -> [LegsAttr, LegsAttr]:
 		"""Returns the boolean contact state of the feet.
