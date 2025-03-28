@@ -7,6 +7,7 @@ from collections.abc import Callable
 from pathlib import Path
 from typing import Any
 import xml.etree.ElementTree as ET
+import time
 
 import gymnasium as gym
 import mujoco
@@ -134,6 +135,9 @@ class QuadrupedEnv(gym.Env):
 		self.base_ang_vel_range = _process_range(ref_base_ang_vel)
 		self.ground_friction_coeff_range = _process_range(ground_friction_coeff)
 		self.legs_order = legs_order
+		
+		# Variable used to pause the simulation
+		self.is_paused = False
 
 		# Define the model and data _______________________________________________________________
 		# TODO: We should create a scene with the desired terrain and load the robot model (or multiple instances of the
@@ -239,6 +243,11 @@ class QuadrupedEnv(gym.Env):
 				    bool: Whether the episode is truncated.
 				    dict: Additional information.
 		"""
+
+		# When the simulation is paused, enter a  wait loop until the simulation is unpaused.
+		while self.is_paused:
+			time.sleep(0.1)
+
 		# Apply action (torque) to the robot
 		self.mjData.ctrl = action
 		mujoco.mj_step(self.mjModel, self.mjData)
@@ -1122,6 +1131,8 @@ class QuadrupedEnv(gym.Env):
 		elif keycode == 345:  # ctrl
 			self._ref_base_lin_vel_H *= 0.0
 			self._ref_base_ang_yaw_dot = 0.0
+		if keycode == 32:
+			self.is_paused = not self.is_paused
 
 		self._ref_base_ang_yaw_dot = np.clip(self._ref_base_ang_yaw_dot, -2 * np.pi, 2 * np.pi)
 		self._ref_base_lin_vel_H[0] = np.clip(self._ref_base_lin_vel_H[0], -6 * self.hip_height, 6 * self.hip_height)
