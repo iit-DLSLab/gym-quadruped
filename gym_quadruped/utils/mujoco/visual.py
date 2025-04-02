@@ -272,10 +272,10 @@ def render_ghost_robot(viewer: Handle, mj_model: MjModel, mj_data: MjData, alpha
 		dec_geom.reflectance = 0.0
 		# Copy the mesh and texture attributes
 		dec_geom.dataid = geom.dataid
-		dec_geom.texid = geom.texid
-		dec_geom.texcoord = geom.texcoord
-		dec_geom.texrepeat = geom.texrepeat
-		dec_geom.texuniform = geom.texuniform
+		# dec_geom.texid = geom.texid
+		# dec_geom.texcoord = geom.texcoord
+		# dec_geom.texrepeat = geom.texrepeat
+		# dec_geom.texuniform = geom.texuniform
 		dec_geom.emission = geom.emission
 		dec_geom.specular = geom.specular
 		dec_geom.shininess = geom.shininess

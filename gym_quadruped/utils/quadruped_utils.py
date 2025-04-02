@@ -304,6 +304,10 @@ def configure_observation_space(mj_model: mujoco.MjModel, obs_names: Sequence[st
 			obs_dim = 3
 			obs_lim_max = [np.inf] * obs_dim
 			obs_lim_min = [-np.inf] * obs_dim
+		elif obs_name in ['work', 'kinetic_energy']:
+			obs_dim = 1
+			obs_lim_max = [np.inf]
+			obs_lim_min = [-np.inf]
 		else:
 			from gym_quadruped.quadruped_env import QuadrupedEnv
 
@@ -367,7 +371,7 @@ def configure_observation_space_representations(
 			continue  # Quaternion does not have a left-group action definition.
 		elif obs_name == 'qvel':
 			obs_reps[obs_name] = rep_Rd + rep_Rd_pseudo + rep_TqQ_js  # lin_vel , ang_vel, joint_vel
-		elif obs_name == 'tau_ctrl_setpoint':
+		elif obs_name == 'tau_ctrl_setpoint' or obs_name == 'action':
 			obs_reps[obs_name] = rep_TqQ_js
 		elif obs_name == 'qpos_js':  # Joint space position configuration
 			obs_reps[obs_name] = rep_Q_js
@@ -397,6 +401,8 @@ def configure_observation_space_representations(
 			obs_reps[obs_name] = rep_Rd
 		elif 'imu_gyro' in obs_names:  # Same as angular velocity
 			obs_reps[obs_name] = rep_Rd_pseudo
+		elif obs_name in ['work', 'kinetic_energy', 'reward']:
+			obs_reps[obs_name] = G.trivial_representation
 		else:
 			from gym_quadruped.quadruped_env import QuadrupedEnv
 

@@ -124,7 +124,10 @@ class H5Writer:
 				for key, obs_shape in extra_obs.items():
 					shape = (0, 0) + obs_shape  # Trajectory/Episode id, time, obs_shape
 					max_shape = (None, None) + obs_shape  # Trajectory/Episode id, time, obs_shape
-					recordings.create_dataset(key, shape=shape, maxshape=max_shape, dtype='float64')
+					try:
+						recordings.create_dataset(key, shape=shape, maxshape=max_shape, dtype='float64')
+					except Exception as e:
+						raise Exception(f'Error while saving {key} of shape {obs_shape}') from e
 
 	def append_trajectory(self, state_obs_traj: dict[str, np.ndarray], time: np.ndarray):
 		"""
@@ -160,9 +163,15 @@ class H5Writer:
 				obs_dataset = recordings[key]
 				obs_shape = value.shape[1:]  # Extract shape after time dimension
 
-				# Resize dataset to add the new trajectory
-				obs_dataset.resize((new_traj_idx + 1, num_steps) + obs_shape)
-				obs_dataset[new_traj_idx, :, ...] = value  # Store new observation data
+				try:
+					# Resize dataset to add the new trajectory
+					obs_dataset.resize((new_traj_idx + 1, num_steps) + obs_shape)
+					obs_dataset[new_traj_idx, :, ...] = value  # Store new observation data
+				except Exception:
+					raise Exception(
+						f'Error appending {key} traj of shape={value.shape} type={value.dtype},\n '
+						f'Expected shape=({num_steps},{obs_shape}) type={obs_dataset.dtype}'
+					)
 
 
 class H5Reader:

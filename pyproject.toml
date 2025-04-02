@@ -31,6 +31,7 @@ dependencies = [
     "noise",
     "opencv-python",
     "h5py",
+    "gymnasium",
 ]
 
 [tool.ruff]

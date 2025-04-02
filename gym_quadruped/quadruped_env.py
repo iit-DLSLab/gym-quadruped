@@ -3,10 +3,10 @@ from __future__ import annotations
 import copy
 import itertools
 import os
+import xml.etree.ElementTree as ET
 from collections.abc import Callable
 from pathlib import Path
 from typing import Any
-import xml.etree.ElementTree as ET
 
 import gymnasium as gym
 import mujoco
@@ -17,13 +17,13 @@ from mujoco import MjData, MjModel
 from scipy.spatial.transform import Rotation
 
 from gym_quadruped.sensors.base_sensor import Sensor
-from gym_quadruped.utils.math_utils import angle_between_vectors, homogenous_transform, _process_range
+from gym_quadruped.utils.math_utils import _process_range, angle_between_vectors, homogenous_transform
 from gym_quadruped.utils.mujoco.terrain import generate_terrain
 from gym_quadruped.utils.mujoco.visual import change_robot_appearance, render_ghost_robot, render_vector
 from gym_quadruped.utils.quadruped_utils import (
-	configure_observation_space_representations,
 	LegsAttr,
 	configure_observation_space,
+	configure_observation_space_representations,
 	extract_mj_joint_info,
 )
 
@@ -37,15 +37,17 @@ BASE_OBS = [
 	'base_ori_euler_xyz',
 	'base_ori_quat_wxyz',
 	'base_ori_SO3',
-	'gravity_vector',
+	'gravity_vector:base',
 ]
 BASE_OBS_BASE_FRAME = [
 	'base_lin_vel:base',
 	'base_lin_vel_err:base',
 	'base_lin_acc:base',
 	'base_ang_vel:base',
+	'base_ang_vel_err:base',
 ]
-GEN_COORDS_OBS = ['qpos', 'qvel', 'tau_ctrl_setpoint', 'qpos_js', 'qvel_js']
+GEN_COORDS_OBS = ['qpos', 'qvel', 'tau_ctrl_setpoint', 'qpos_js', 'qvel_js', 'kinetic_energy', 'work']
+
 FEET_OBS = [
 	'feet_pos',
 	'feet_pos:base',
@@ -142,7 +144,9 @@ class QuadrupedEnv(gym.Env):
 		base_path = Path(dir_path) / 'robot_model' / robot
 		procedural_assets_path = Path(dir_path) / 'utils' / 'mujoco' / 'assets'
 		base_scene_env_path = base_path / f'scene_{scene}.xml'
-		scene_env, self.terrain_limits = generate_terrain(base_scene_env_path, procedural_assets_path, hip_height, scene, seed=10)
+		scene_env, self.terrain_limits = generate_terrain(
+			base_scene_env_path, procedural_assets_path, hip_height, scene, seed=10
+		)
 
 		try:  # to load the robot's model on custom terrain scene.
 			root = scene_env.getroot()
@@ -242,7 +246,6 @@ class QuadrupedEnv(gym.Env):
 		# Apply action (torque) to the robot
 		self.mjData.ctrl = action
 		mujoco.mj_step(self.mjModel, self.mjData)
-
 		# Step all custom sensors if present.
 		for sensor in self.sensors:
 			sensor.step()
@@ -307,10 +310,12 @@ class QuadrupedEnv(gym.Env):
 				self.mjData.qpos[7:] += np.random.uniform(-q_pos_amp, q_pos_amp, self.mjModel.nq - 7)
 				self.mjData.qvel[6:] += np.random.uniform(-q_vel_amp, q_vel_amp, self.mjModel.nv - 6)
 
-				xy_pos = np.array([
-					np.random.uniform(-self.terrain_limits[0] * (3/4), self.terrain_limits[0] * (3/4)),
-					np.random.uniform(-self.terrain_limits[1] * (3/4), self.terrain_limits[1] * (3/4)),
-				])
+				xy_pos = np.array(
+					[
+						np.random.uniform(-self.terrain_limits[0] * (3 / 4), self.terrain_limits[0] * (3 / 4)),
+						np.random.uniform(-self.terrain_limits[1] * (3 / 4), self.terrain_limits[1] * (3 / 4)),
+					]
+				)
 				self.mjData.qpos[0:2] = xy_pos
 
 				# Random orientation
@@ -323,18 +328,16 @@ class QuadrupedEnv(gym.Env):
 						np.random.uniform(-roll_sweep, roll_sweep),
 						np.random.uniform(-pitch_sweep, pitch_sweep),
 						theta,
-						],
-					).as_quat(scalar_first=True)
+					],
+				).as_quat(scalar_first=True)
 				self.mjData.qpos[3:7] = ori_wxyz
 
-				try:
-					feet_pos = self.feet_pos(frame='world')
-					max_z = np.max([pos[2] for pos in feet_pos.to_list()])
-					self.mjData.qpos[2] -= max_z
-				except ValueError:
-					self.mjData.qpos[2] = self.hip_height + np.random.uniform(
-						-0.05 * self.hip_height, 0.05 * self.hip_height
-					)
+				# try:
+				# 	feet_pos = self.feet_pos(frame='world')
+				# 	max_z = np.max([pos[2] for pos in feet_pos.to_list()])
+				# 	self.mjData.qpos[2] -= max_z
+				# except ValueError:
+				self.mjData.qpos[2] = self.hip_height
 
 			# Perform a forward dynamics computation to update the contact information
 			mujoco.mj_step1(self.mjModel, self.mjData)
@@ -343,7 +346,7 @@ class QuadrupedEnv(gym.Env):
 			while np.any(contact_state.to_list()):
 				all_contacts = list(itertools.chain(*contacts.to_list()))
 				max_penetration_distance = np.max([np.abs(contact.dist) for contact in all_contacts])
-				self.mjData.qpos[2] += max_penetration_distance * 1.1
+				self.mjData.qpos[2] += max_penetration_distance * 1.01  # must be larger 1.0
 				mujoco.mj_step1(self.mjModel, self.mjData)
 				contact_state, contacts = self.feet_contact_state()
 		else:
@@ -677,7 +680,6 @@ class QuadrupedEnv(gym.Env):
 
 		return feet_trans_jac if not return_rot_jac else (feet_trans_jac, feet_rot_jac)
 
-
 	def feet_jacobians_dot(self, frame: str = 'world', return_rot_jac: bool = False) -> LegsAttr | tuple[LegsAttr, ...]:
 		"""Compute the Jacobians derivative of the feet positions.
 
@@ -735,7 +737,6 @@ class QuadrupedEnv(gym.Env):
 				feet_rot_jac_dot[leg_name] = R.T @ feet_rot_jac_dot[leg_name]
 
 		return feet_trans_jac_dot if not return_rot_jac else (feet_trans_jac_dot, feet_rot_jac_dot)
-
 
 	def feet_contact_state(self, frame='world', ground_reaction_forces=False) -> [LegsAttr, LegsAttr]:
 		"""Returns the boolean contact state of the feet.
@@ -861,6 +862,37 @@ class QuadrupedEnv(gym.Env):
 		return com
 
 	@property
+	def kinetic_energy(self) -> float:
+		""" Compute the kinetic energy of the robot. """
+		# Compute kinetic energy  # TODO: this returns 0 in some cases.
+		# mujoco.mj_forward(self.mjModel, self.mjData)
+		# mujoco.mj_energyVel(self.mjModel, self.mjData)
+		# kinetic_energy = self.mjData.energy[1]
+
+		M = np.zeros((self.mjModel.nv, self.mjModel.nv))
+		mujoco.mj_fullM(self.mjModel, M, self.mjData.qM)
+		kinetic_energy = 1 / 2 * self.mjData.qvel.T @ M @ self.mjData.qvel
+
+		return kinetic_energy
+
+	@property
+	def work(self) -> float:
+		"""
+		Compute and return the work done by the robot using the MuJoCo `
+
+		M(q) ddq = Tau(q, dq, F) = tau_crtl - c(q, dq) - G(q) + J^T(q) F
+		"""
+		# Allocate memory for the mass matrix
+		Mq = np.zeros((self.mjModel.nv, self.mjModel.nv))
+		# Convert the sparse mass matrix to a dense one
+		mujoco.mj_fullM(self.mjModel, Mq, self.mjData.qM)
+
+		gen_forces = Mq @ self.mjData.qacc  # U(q, dq, F) = M(q) ddq
+		work = np.dot(gen_forces, self.mjData.qvel)
+
+		return work
+
+	@property
 	def base_configuration(self):
 		"""Robot base configuration (homogenous transformation matrix) in world reference frame."""
 		com_pos = self.mjData.qpos[0:3]  # world frame
@@ -909,7 +941,10 @@ class QuadrupedEnv(gym.Env):
 	@property
 	def gravity_vector(self):
 		"""Returns the world-z axis unitary vector in base frame. This is an observable orientation"""
-		return self.base_configuration[0:3, 2]
+		g_world = np.array([[0, 0, -1]]).T
+		R_B = self.base_configuration[0:3, 0:3]
+		g_B = R_B.T @ g_world
+		return np.squeeze(g_B)
 
 	@property
 	def simulation_dt(self):
@@ -965,10 +1000,14 @@ class QuadrupedEnv(gym.Env):
 				obs_val = self.mjData.qvel[6:].copy()
 			elif obs_name == 'base_pos':
 				obs_val = self.base_pos.copy()
+			elif 'base_lin_vel_err' in obs_name:
+				obs_val = self.base_lin_vel_err(frame).copy()
 			elif 'base_lin_vel' in obs_name:
 				obs_val = self.base_lin_vel(frame).copy()
 			elif 'base_lin_acc' in obs_name:
 				obs_val = self.base_lin_acc(frame).copy()
+			elif 'base_ang_vel_err' in obs_name:
+				obs_val = self.base_ang_vel_err(frame).copy()
 			elif 'base_ang_vel' in obs_name:
 				obs_val = self.base_ang_vel(frame).copy()
 			elif obs_name == 'base_ori_euler_xyz':
@@ -987,8 +1026,12 @@ class QuadrupedEnv(gym.Env):
 			elif 'contact_forces' in obs_name:
 				_, _, contact_forces = self.feet_contact_state(ground_reaction_forces=True, frame=frame)
 				obs_val = np.concatenate(contact_forces.to_list(order=self.legs_order), axis=0).copy()
-			elif 'gravity_vector' in obs_name:
+			elif obs_name == 'gravity_vector:base':
 				obs_val = self.gravity_vector.copy()
+			elif obs_name == 'work':
+				obs_val = self.work
+			elif obs_name == 'kinetic_energy':
+				obs_val = self.kinetic_energy
 			else:  # If not a predefined observation, check if it is a sensor observation
 				is_sensor_obs = False
 				for sensor in self.sensors:
@@ -1198,8 +1241,10 @@ if __name__ == '__main__':
 		base_vel_command_type='random',  # "forward", "random", "forward+rotate", "human"
 		state_obs_names=state_observables_names,  # Desired quantities in the 'state'
 	)
+
 	obs = env.reset()
 	env.render(tint_robot=True)
+
 	for _ in range(10):
 		obs = env.reset()
 		for _ in range(20000):
@@ -1208,6 +1253,7 @@ if __name__ == '__main__':
 			action = env.action_space.sample() * 50  # Sample random action
 			state, reward, is_terminated, is_truncated, info = env.step(action=action)
 
+			# print(f"Kinetic energy: {state['kinetic_energy'].item():.3e} \t Work done: {state['work'].item():.3e}")
 			for state_obs_name in state_observables_names:
 				assert state_obs_name in state, f'Missing state observation: {state_obs_name}'
 				assert state[state_obs_name] is not None, f'Invalid state observation: {state_obs_name}'
