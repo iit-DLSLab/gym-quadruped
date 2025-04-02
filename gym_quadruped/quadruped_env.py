@@ -889,7 +889,7 @@ class QuadrupedEnv(gym.Env):
 		"""
 		Compute and return the work done by the robot using the MuJoCo `
 
-		M(q) ddq = Tau(q, dq, F) = tau_crtl - c(q, dq) - G(q) + J^T(q) F
+		M(q) ddq = Tau(q, dq, F) = tau_ctrl - c(q, dq) - G(q) + J^T(q) F
 		"""
 		# Allocate memory for the mass matrix
 		Mq = np.zeros((self.mjModel.nv, self.mjModel.nv))
@@ -1038,9 +1038,9 @@ class QuadrupedEnv(gym.Env):
 			elif obs_name == 'gravity_vector:base':
 				obs_val = self.gravity_vector.copy()
 			elif obs_name == 'work':
-				obs_val = self.work
+				obs_val = np.atleast_1d(self.work)
 			elif obs_name == 'kinetic_energy':
-				obs_val = self.kinetic_energy
+				obs_val = np.atleast_1d(self.kinetic_energy)
 			else:  # If not a predefined observation, check if it is a sensor observation
 				is_sensor_obs = False
 				for sensor in self.sensors:
