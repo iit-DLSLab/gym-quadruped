@@ -1038,9 +1038,9 @@ class QuadrupedEnv(gym.Env):
 			elif obs_name == 'gravity_vector:base':
 				obs_val = self.gravity_vector.copy()
 			elif obs_name == 'work':
-				obs_val = self.work
+				obs_val = np.atleast_1d(self.work)
 			elif obs_name == 'kinetic_energy':
-				obs_val = self.kinetic_energy
+				obs_val = np.atleast_1d(self.kinetic_energy)
 			else:  # If not a predefined observation, check if it is a sensor observation
 				is_sensor_obs = False
 				for sensor in self.sensors:
