@@ -36,7 +36,7 @@ def test_robot_env(robot_name, terrain_type):
 	state_observables_names = tuple(QuadrupedEnv.ALL_OBS)
 
 	env = QuadrupedEnv(
-		robot='mini_cheetah',
+		robot=robot_name,
 		hip_height=0.25,
 		legs_joint_names=robot_leg_joints,  # Joint names of the legs DoF
 		feet_geom_name=robot_feet_geom_names,  # Geom/Frame id of feet
