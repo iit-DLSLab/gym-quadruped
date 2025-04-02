@@ -889,7 +889,7 @@ class QuadrupedEnv(gym.Env):
 		"""
 		Compute and return the work done by the robot using the MuJoCo `
 
-		M(q) ddq = Tau(q, dq, F) = tau_crtl - c(q, dq) - G(q) + J^T(q) F
+		M(q) ddq = Tau(q, dq, F) = tau_ctrl - c(q, dq) - G(q) + J^T(q) F
 		"""
 		# Allocate memory for the mass matrix
 		Mq = np.zeros((self.mjModel.nv, self.mjModel.nv))
