@@ -1,27 +1,27 @@
 [project]
 name = "gym-quadruped"
-version = "0.0.11"
+version = "1.0.0"
 description = "A gym environment for quadruped robots using MuJoCo physics engine."
 authors = [
-    { name="Daniel Ordoñez-Apraez", email="daniels.ordonez@gmail.com" },
-    { name="Giulio Turrisi", email="giulio.turrisi@iit.it" },
+    { name = "Daniel Ordoñez-Apraez", email = "daniels.ordonez@gmail.com" },
+    { name = "Giulio Turrisi", email = "giulio.turrisi@iit.it" },
 ]
 maintainers = [
-    { name="Daniel Felipe Ordoñez Apraez", email="daniels.ordonez@gmail.com" },
+    { name = "Daniel Felipe Ordoñez Apraez", email = "daniels.ordonez@gmail.com" },
 ]
 
 readme = "README.md"
 #license = "TODO"
 keywords = ["robotics", "locomotion", "quadruped", "deep", "reinforcement", "learning", "environment", "gym", "gymnasium", "mujoco"]
-classifiers=[
-    "Development Status :: 3 - Alpha",
+classifiers = [
+    "Development Status :: 5 - Production/Stable",
     "Intended Audience :: Developers",
     "Topic :: Software Development :: Build Tools",
     "License :: OSI Approved :: Apache Software License",
     "Programming Language :: Python :: 3.10",
 ]
 
-packages = [{include = "gym_quadruped"}]
+packages = [{ include = "gym_quadruped" }]
 
 dependencies = [
     "numpy",
@@ -62,43 +62,65 @@ exclude = [
     "dist",
     "node_modules",
     "venv",
+    "examples",
+    "data",
 ]
 
 
-[tool.ruff.lint]
+[tool.ruff.lint] # ===============================================================================
+pydocstyle.convention = "google"
+
+# Enable specific linting rules
 select = [
-    "E",    # pycodestyle
-#    "W",    # pycodestyle
-    "F",    # Pyflakes
-    "I",
-    "N",
-    "B",
-    "C4",
-    "UP",
-    "FA",
-    "ISC",
-    "ICN",
+    "F",    # pyflakes: general code quality checks
+    "E",    # pycodestyle: PEP8 error checks
+    "W",    # pycodestyle: PEP8 warning checks
+    "I",    # isort: import sorting checks
+    "D",    # pydocstyle: docstring style checks,
+    "FA",   # Future annotations
+    "ISC",  # String concat
+    "ICN",  # Import conventions
     "SIM"   # flake8-simplify
 ]
+
+# Ignore specific linting rules
 ignore = [
-    "D401",  # good for methods but not for class docstrings
-    "D405",  # British-style section names are also "proper"!
-    "E701",  # short single-line statements are fine
-    "D100",
-    "N806",  # Uppercase letters are useful sometimes, we are not python Hitler here
-    "N806",  # Uppercase letters are useful sometimes, we are not python Hitler here
+    "D401", # Allow any docstring to start with a capital letter, not just "This"
+    "D405", # Allow non-imperative mood in docstring section names
+    "E701", # Allow multiple statements on one line (colon)
+    "D100",  # Ignore missing docstring in public module
+    "F401", # Don't remove unused imports
+    "D107", # Document __init__ arguments inside class docstring
+    "W191", # Tabs and spaces mixed in indentation
 ]
 
-[tool.ruff.lint.pydocstyle]
-convention = "google"
-
-[tool.ruff.format]
+[tool.ruff.format] # ===============================================================================
+exclude = ["*.pyi"]
 quote-style = "single"
-indent-style = "tab"
+# Like Black, respect magic trailing commas.
+skip-magic-trailing-comma = false
 docstring-code-format = true
-
+docstring-code-line-length = "dynamic"
 
 #_______________________________________________________
 [build-system]
 requires = ["hatchling"]
 build-backend = "hatchling.build"
+
+# Pypi build configuration._________________________________________________________________________
+[tool.hatch.build] # ===============================================================================
+include = [
+    "gym_quadruped/**", # Only include necessary package files
+]
+exclude = [
+    ".github/**", # Exclude GitHub workflows
+    ".git/**",
+    ".idea/**",
+    "tests/**", # Exclude test files
+    "*.log", # Exclude log files
+    "*.zip", "*.tar.gz", # Exclude compressed files
+    "*.h5", # Exclude large data files
+    "*.mat", # Exclude large data files
+    "*.pkl", # Exclude pickle files
+    "__pycache__/**", # Exclude Python cache files
+]

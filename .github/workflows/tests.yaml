@@ -16,8 +16,8 @@ jobs:
     continue-on-error: true
     strategy:
       matrix:
-        os: [ubuntu-latest]
-        python-version: ["3.12","3.11","3.10","3.9.21", "3.8.18"]
+        os: [ ubuntu-latest ]
+        python-version: [ "3.12","3.11","3.10" ]
 
     steps:
       - name: Checkout Repository
@@ -30,7 +30,7 @@ jobs:
 
       - name: Install Dependencies
         run: python -m pip install --upgrade pip
-          
+
       - name: Install Package in Editable Mode with Development Dependencies
         run: python -m pip install -e ".[pin]"
 
