@@ -9,10 +9,25 @@
     </visual>
 
     <asset>
-        <texture type="skybox" builtin="gradient" rgb1="0.99 0.99 0.99" rgb2="0.99 0.99 0.99" width="512"
-                 height="3072"/>
-        <texture type="2d" name="groundplane" builtin="checker" mark="edge" rgb1="0.80 0.80 0.80" rgb2="0.99 0.99 0.99"
-                 markrgb="0.8 0.8 0.8" width="500" height="500"/>
+        <texture
+                type="skybox"
+                builtin="gradient"
+                rgb1="0.99 0.99 0.99"
+                rgb2="0.99 0.99 0.99"
+                width="512"
+                height="3072"
+        />
+        <texture
+                type="2d"
+                name="groundplane"
+                builtin="checker"
+                mark="edge"
+                rgb1="0.93 0.93 0.93"
+                rgb2="1.0 1.0 1.0"
+                markrgb="1 1 1"
+                width="200"
+                height="200"
+        />
         <material name="groundplane" texture="groundplane" texuniform="true" texrepeat="5 5" reflectance="0.05"/>
     </asset>
 

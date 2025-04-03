@@ -1,45 +1,23 @@
 # Created by Daniel Ordoñez (daniels.ordonez@gmail.com) at 02/04/25
+import logging
+
 import numpy as np
 import pytest
 
 from gym_quadruped.quadruped_env import QuadrupedEnv
 
+# Configure logging
+logging.basicConfig(level=logging.DEBUG)
+logger = logging.getLogger(__name__)
 
-@pytest.mark.parametrize('robot_name', ['mini_cheetah', 'b2', 'go1', 'go2', 'hyqreal'])
+
+@pytest.mark.parametrize('robot_name', ['b2', 'go1', 'go2', 'hyqreal', 'mini_cheetah', 'aliengo'])
 @pytest.mark.parametrize('terrain_type', ['flat', 'perlin'])
 def test_robot_env(robot_name, terrain_type):  # noqa: D103
-    # TODO: Need to make the config for each robot into yaml files.
-    robot_feet_geom_names = {'FL': 'FL', 'FR': 'FR', 'RL': 'RL', 'RR': 'RR'}
-    robot_leg_joints = {
-        'FL': [
-            'FL_hip_joint',
-            'FL_thigh_joint',
-            'FL_calf_joint',
-        ],  # TODO: Make configs per robot.
-        'FR': [
-            'FR_hip_joint',
-            'FR_thigh_joint',
-            'FR_calf_joint',
-        ],
-        'RL': [
-            'RL_hip_joint',
-            'RL_thigh_joint',
-            'RL_calf_joint',
-        ],
-        'RR': [
-            'RR_hip_joint',
-            'RR_thigh_joint',
-            'RR_calf_joint',
-        ],
-    }
-
+    print(f'Testing robot {robot_name} on terrain {terrain_type}')
     state_observables_names = tuple(QuadrupedEnv.ALL_OBS)
-
     env = QuadrupedEnv(
         robot=robot_name,
-        hip_height=0.25,
-        legs_joint_names=robot_leg_joints,  # Joint names of the legs DoF
-        feet_geom_name=robot_feet_geom_names,  # Geom/Frame id of feet
         scene=terrain_type,
         ref_base_lin_vel=(0.5, 1.0),  # pass a float for a fixed value
         ground_friction_coeff=(0.2, 1.5),  # pass a float for a fixed value

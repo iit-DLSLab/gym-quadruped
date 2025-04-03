@@ -177,11 +177,10 @@ def change_robot_appearance(mjModel: mujoco.MjModel, alpha=1.0):
     HR_leg_color = [0.710, 0.703, 0.703, alpha]  # Awesome Light grey
 
     for geom_id in range(mjModel.ngeom):
-        geom_name = mujoco.mj_id2name(mjModel, mujoco.mjtObj.mjOBJ_GEOM, geom_id)
         prev_color = mjModel.geom_rgba[geom_id]
         body_id = mjModel.geom_bodyid[geom_id]
         body_name = mujoco.mj_id2name(mjModel, mujoco.mjtObj.mjOBJ_BODY, body_id)
-        if geom_name in ['floor', 'plane', 'world', 'ground']:
+        if body_name in ['floor', 'plane', 'world', 'ground']:
             continue
         if prev_color[-1] == 0.0:
             continue  # Skip transparent geoms
@@ -197,7 +196,7 @@ def change_robot_appearance(mjModel: mujoco.MjModel, alpha=1.0):
                 color = HR_leg_color
             else:
                 color = robot_color
-
+            # print(f'{geom_name} {body_name}: {color}')
             # Change the visual appearance of the geom
             mjModel.geom_rgba[geom_id] = color
 

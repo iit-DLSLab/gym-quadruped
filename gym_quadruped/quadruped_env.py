@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import copy
 import itertools
+import logging
 import os
 import time
 import xml.etree.ElementTree as ET
@@ -17,6 +18,7 @@ from gymnasium import spaces
 from mujoco import MjData, MjModel
 from scipy.spatial.transform import Rotation
 
+from gym_quadruped.robot_cfgs import RobotConfig, get_robot_config
 from gym_quadruped.sensors.base_sensor import Sensor
 from gym_quadruped.utils.math_utils import _process_range, angle_between_vectors, homogenous_transform
 from gym_quadruped.utils.mujoco.terrain import generate_terrain
@@ -27,6 +29,8 @@ from gym_quadruped.utils.quadruped_utils import (
     configure_observation_space_representations,
     extract_mj_joint_info,
 )
+
+log = logging.getLogger(__name__)
 
 BASE_OBS = [
     'base_pos',
@@ -79,8 +83,6 @@ class QuadrupedEnv(gym.Env):
     def __init__(
         self,
         robot: str,
-        hip_height: float,
-        legs_joint_names: dict,
         state_obs_names: tuple[str, ...] = _DEFAULT_OBS,
         scene: str = 'flat',
         sim_dt: float = 0.002,
@@ -89,7 +91,6 @@ class QuadrupedEnv(gym.Env):
         ref_base_ang_vel: tuple[float, float] | float | VelCallable = 0.0,  # [rad/s]
         ground_friction_coeff: tuple[float, float] | float = 1.0,
         legs_order: tuple[str, str, str, str] = ('FL', 'FR', 'RL', 'RR'),
-        feet_geom_name: dict = None,
         sensors: tuple[{Sensor}, ...] = None,  # Class names of Sensor instances
         sensors_kwargs: tuple[dict[str, Any]] = None,
     ):
@@ -99,8 +100,8 @@ class QuadrupedEnv(gym.Env):
         ----
             robot: Robot model name.
             hip_height: Nominal height of the robot's hip from the ground.
-            legs_joint_names: (dict) Dict with keys FL, FR, RL, RR; and as values a list of joint names associated with
-                each of the four legs.
+            self.robot_cfg.leg_joints: (dict) Dict with keys FL, FR, RL, RR; and as values a list of joint names
+            associated with each of the four legs.
             state_obs_names: (tuple) Names of the state observations to include in the observation space.
             scene: Name of the ground terrain, available are 'flat', 'perlin', TODO: more
             sim_dt: Time step of the mujoco simulation.
@@ -126,11 +127,12 @@ class QuadrupedEnv(gym.Env):
             sensors_kwargs: (tuple) Tuple with the kwargs to pass to the sensors constructors.
         """
         super(QuadrupedEnv, self).__init__()
+        log.info(f'Initializing {robot} environment with scene {scene}.')
 
         # Store all initialization arguments in a dictionary. Useful if we want to reconstruct this environment.
         self._save_hyperparameters(constructor_params=locals().copy())
         self.robot_name = robot
-        self.hip_height = hip_height
+        self.robot_cfg: RobotConfig = get_robot_config(robot_name=robot)
 
         self.base_vel_command_type = base_vel_command_type
         self.base_lin_vel_range = _process_range(ref_base_lin_vel)
@@ -141,17 +143,16 @@ class QuadrupedEnv(gym.Env):
         # Variable used to pause the simulation
         self.is_paused = False
 
-        # Define the model and data _______________________________________________________________
-        # TODO: We should create a scene with the desired terrain and load the robot model (or multiple instances of the
-        #   robot models relying on robot_descriptions.py. This way of loading the XML is not ideal.
+        # Define the terrain/scene environment _______________________________________________________________
         dir_path = os.path.dirname(os.path.realpath(__file__))
         base_path = Path(dir_path) / 'robot_model' / robot
         procedural_assets_path = Path(dir_path) / 'utils' / 'mujoco' / 'assets'
         base_scene_env_path = base_path / f'scene_{scene}.xml'
         scene_env, self.terrain_limits = generate_terrain(
-            base_scene_env_path, procedural_assets_path, hip_height, scene, seed=10
+            base_scene_env_path, procedural_assets_path, self.robot_cfg.hip_height, scene, seed=10
         )
 
+        # Define the robot model to load to the scene ________________________________________________________
         try:  # to load the robot's model on custom terrain scene.
             root = scene_env.getroot()
             # Add include of the robot model
@@ -164,6 +165,10 @@ class QuadrupedEnv(gym.Env):
             scene_env.write(scene_env_path)
 
             self.mjModel: MjModel = mujoco.MjModel.from_xml_path(str(scene_env_path.absolute()))
+            if self.robot_cfg.qpos0_js is not None:  # If custom zero position is provided, use it.
+                print(f'Updating the joint space zero configuration for {self.robot_name} to {self.robot_cfg.qpos0_js}')
+                self.mjModel.qpos0[7:] = np.array(self.robot_cfg.qpos0_js)
+
         except ValueError as e:
             raise ValueError(f'Error loading the scene {scene_env_path}:') from e
 
@@ -175,7 +180,9 @@ class QuadrupedEnv(gym.Env):
         self.mjModel.opt.timestep = sim_dt
 
         # Identify the legs DoF indices/address in the qpos and qvel arrays ___________________________________________
-        assert legs_joint_names is not None, 'Please provide the joint names associated with each of the four legs.'
+        assert self.robot_cfg.leg_joints is not None, (
+            'Please provide the joint names associated with each of the four legs.'
+        )
         self.joint_info = extract_mj_joint_info(self.mjModel)
         self.legs_qpos_idx = LegsAttr(None, None, None, None)  # Indices of legs joints in qpos vector
         self.legs_qvel_idx = LegsAttr(None, None, None, None)  # Indices of legs joints in qvel vector
@@ -183,7 +190,7 @@ class QuadrupedEnv(gym.Env):
         # Ensure the joint names of the robot's legs' joints are in the model. And store the qpos and qvel indices
         for leg_name in ['FR', 'FL', 'RR', 'RL']:
             qpos_idx, qvel_idx, tau_idx = [], [], []
-            leg_joints = legs_joint_names[leg_name]
+            leg_joints = self.robot_cfg.leg_joints[leg_name]
             for joint_name in leg_joints:
                 assert joint_name in self.joint_info, f'Joint {joint_name} not found in {list(self.joint_info.keys())}'
                 qpos_idx.extend(self.joint_info[joint_name].qpos_idx)
@@ -198,8 +205,8 @@ class QuadrupedEnv(gym.Env):
             LegsAttr(None, None, None, None),
             LegsAttr(None, None, None, None),
         )
-        if feet_geom_name is not None:
-            self._find_feet_model_attrs(feet_geom_name)
+        if self.robot_cfg.feet_geom_names is not None:
+            self._find_feet_model_attrs(self.robot_cfg.feet_geom_names)
 
         # Action space: Torque values for each joint _________________________________________________________________
         tau_low, tau_high = (
@@ -247,6 +254,7 @@ class QuadrupedEnv(gym.Env):
         """
         # When the simulation is paused, enter a  wait loop until the simulation is unpaused.
         while self.is_paused:
+            # print('.', end='')
             time.sleep(0.1)
 
         # Apply action (torque) to the robot
@@ -343,18 +351,22 @@ class QuadrupedEnv(gym.Env):
                 # 	max_z = np.max([pos[2] for pos in feet_pos.to_list()])
                 # 	self.mjData.qpos[2] -= max_z
                 # except ValueError:
-                self.mjData.qpos[2] = self.hip_height
+                self.mjData.qpos[2] = self.robot_cfg.hip_height
 
             # Perform a forward dynamics computation to update the contact information
             mujoco.mj_step1(self.mjModel, self.mjData)
             # Check if the robot is in contact with the ground. If true lift the robot until contact is broken.
             contact_state, contacts = self.feet_contact_state()
-            while np.any(contact_state.to_list()):
+            c = 0
+            while np.any(contact_state.to_list()) and c < 100:
                 all_contacts = list(itertools.chain(*contacts.to_list()))
                 max_penetration_distance = np.max([np.abs(contact.dist) for contact in all_contacts])
-                self.mjData.qpos[2] += max_penetration_distance * 1.01  # must be larger 1.0
+                self.mjData.qpos[2] += max_penetration_distance * 1.05  # must be larger 1.0
                 mujoco.mj_step1(self.mjModel, self.mjData)
                 contact_state, contacts = self.feet_contact_state()
+                c += 1
+            if np.any(contact_state.to_list()):
+                raise RuntimeError('Unable to initialize the robot without ground contact.')
         else:
             self.mjData.qpos = qpos
             self.mjData.qvel = qvel
@@ -457,7 +469,7 @@ class QuadrupedEnv(gym.Env):
             self._render_ghost_robots(qpos=ghost_qpos, alpha=ghost_alpha)
 
         # Update the camera position. _________________________________________________________________________________
-        cam_pos = max(self.hip_height * 0.1, base_pos[2])
+        cam_pos = max(self.robot_cfg.hip_height * 0.1, base_pos[2])
         self._update_camera_target(self.viewer.cam, np.concatenate((base_pos[:2], [cam_pos])))
 
         # Finally, sync the viewer with the data. # TODO: if render mode is rgb, return the frame.
@@ -1164,17 +1176,20 @@ class QuadrupedEnv(gym.Env):
         elif keycode == 263:  # arrow left
             self._ref_base_ang_yaw_dot += np.pi / 6
         elif keycode == 265:  # arrow up
-            self._ref_base_lin_vel_H[0] += 0.25 * self.hip_height  # % of (hip_height / second)
+            self._ref_base_lin_vel_H[0] += 0.25 * self.robot_cfg.hip_height  # % of (hip_height / second)
         elif keycode == 264:  # arrow down
-            self._ref_base_lin_vel_H[0] -= 0.25 * self.hip_height  # % of (hip_height / second)
+            self._ref_base_lin_vel_H[0] -= 0.25 * self.robot_cfg.hip_height  # % of (hip_height / second)
         elif keycode == 345:  # ctrl
             self._ref_base_lin_vel_H *= 0.0
             self._ref_base_ang_yaw_dot = 0.0
-        if keycode == 32:
+        if keycode == 32 and self.viewer is not None:
+            print('Pausing simulation.' if not self.is_paused else 'Resuming simulation.')
             self.is_paused = not self.is_paused
 
         self._ref_base_ang_yaw_dot = np.clip(self._ref_base_ang_yaw_dot, -2 * np.pi, 2 * np.pi)
-        self._ref_base_lin_vel_H[0] = np.clip(self._ref_base_lin_vel_H[0], -6 * self.hip_height, 6 * self.hip_height)
+        self._ref_base_lin_vel_H[0] = np.clip(
+            self._ref_base_lin_vel_H[0], -6 * self.robot_cfg.hip_height, 6 * self.robot_cfg.hip_height
+        )
 
     def _save_hyperparameters(self, constructor_params):
         self._init_args = constructor_params
@@ -1210,39 +1225,15 @@ class QuadrupedEnv(gym.Env):
 
 # Example usage:
 if __name__ == '__main__':
+    from tqdm import tqdm
+
+    render = False
+
     robot_name = 'mini_cheetah'
-    scene_name = 'flat'
-    robot_feet_geom_names = {'FL': 'FL', 'FR': 'FR', 'RL': 'RL', 'RR': 'RR'}
-    robot_leg_joints = {
-        'FL': [
-            'FL_hip_joint',
-            'FL_thigh_joint',
-            'FL_calf_joint',
-        ],  # TODO: Make configs per robot.
-        'FR': [
-            'FR_hip_joint',
-            'FR_thigh_joint',
-            'FR_calf_joint',
-        ],
-        'RL': [
-            'RL_hip_joint',
-            'RL_thigh_joint',
-            'RL_calf_joint',
-        ],
-        'RR': [
-            'RR_hip_joint',
-            'RR_thigh_joint',
-            'RR_calf_joint',
-        ],
-    }
-
+    scene_name = 'perlin'
     state_observables_names = tuple(QuadrupedEnv.ALL_OBS)
-
     env = QuadrupedEnv(
         robot='mini_cheetah',
-        hip_height=0.25,
-        legs_joint_names=robot_leg_joints,  # Joint names of the legs DoF
-        feet_geom_name=robot_feet_geom_names,  # Geom/Frame id of feet
         scene=scene_name,
         ref_base_lin_vel=(0.5, 1.0),  # pass a float for a fixed value
         ground_friction_coeff=(0.2, 1.5),  # pass a float for a fixed value
@@ -1251,11 +1242,12 @@ if __name__ == '__main__':
     )
 
     obs = env.reset()
-    env.render(tint_robot=True)
+    if render:
+        env.render(tint_robot=True)
 
-    for _ in range(10):
+    for ep in range(10):
         obs = env.reset()
-        for _ in range(20000):
+        for step in tqdm(range(20000), desc=f'Episode {ep}', leave=False):
             qpos, qvel = env.mjData.qpos, env.mjData.qvel
 
             action = env.action_space.sample() * 50  # Sample random action
@@ -1276,6 +1268,7 @@ if __name__ == '__main__':
             qpos_ghost1, qpos_ghost2 = np.array(qpos), np.array(qpos)
             qpos_ghost1[0] += 1.0
             qpos_ghost2[0] -= 1.0
-            env.render(ghost_qpos=(qpos_ghost1, qpos_ghost2), ghost_alpha=(0.1, 0.5))
-
+            if render:
+                env.render(ghost_qpos=(qpos_ghost1, qpos_ghost2), ghost_alpha=(0.1, 0.5))
     env.close()
+    print('Done')
