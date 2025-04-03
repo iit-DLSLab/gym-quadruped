@@ -361,7 +361,7 @@ class QuadrupedEnv(gym.Env):
             while np.any(contact_state.to_list()) and c < 100:
                 all_contacts = list(itertools.chain(*contacts.to_list()))
                 max_penetration_distance = np.max([np.abs(contact.dist) for contact in all_contacts])
-                self.mjData.qpos[2] += max_penetration_distance * 1.05  # must be larger 1.0
+                self.mjData.qpos[2] += max_penetration_distance * 1.1  # must be larger 1.0
                 mujoco.mj_step1(self.mjModel, self.mjData)
                 contact_state, contacts = self.feet_contact_state()
                 c += 1
@@ -478,7 +478,7 @@ class QuadrupedEnv(gym.Env):
     def target_base_vel(self, frame='world') -> tuple[np.ndarray, np.ndarray]:
         """Returns the target base linear (3,) and angular (3,) velocity in the world reference frame."""
         if self._ref_base_lin_vel_H is None:
-            raise RuntimeError('Please call env.reset() before accessing the target base velocity.')
+            return np.zeros(3), np.zeros(3)
         R_B_heading = self.heading_orientation_SO3
         ref_base_lin_vel = (R_B_heading @ self._ref_base_lin_vel_H.reshape(3, 1)).squeeze()
         ref_base_ang_vel = np.array([0.0, 0.0, self._ref_base_ang_yaw_dot])
