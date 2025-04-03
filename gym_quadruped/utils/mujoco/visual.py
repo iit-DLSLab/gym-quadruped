@@ -43,6 +43,8 @@ def render_vector(
 
     geom = viewer.user_scn.geoms[geom_id]
 
+    if np.isclose(np.linalg.norm(vector), 0, atol=1e-5):
+        vector = np.random.rand(3)
     # Define the a rotation matrix with the Z axis aligned with the vector direction
     vec_z = vector.squeeze() / np.linalg.norm(vector + 1e-5)
     # Define any orthogonal to z vector as the X axis using the Gram-Schmidt process

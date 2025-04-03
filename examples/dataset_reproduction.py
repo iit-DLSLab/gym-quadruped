@@ -75,7 +75,6 @@ def reproduce_dataset(dataset):
                     G_obs_t['feet_pos'][g],
                 )
                 g_feet_vel = G_obs_t['feet_vel'][g]
-                # g_feet_vel_B = G_obs_t['feet_vel:base'][g]
                 feet_pos = LegsAttr(
                     **{leg_name: g_feet_pos[..., i * 3 : i * 3 + 3] for i, leg_name in enumerate(rec_env.legs_order)}
                 )
@@ -105,14 +104,14 @@ def reproduce_dataset(dataset):
                         color=np.array([0, 1, 0, 0.5]),
                         geom_id=geom_ids.get(f'{g}-grf-{leg_name}', -1),
                     )
-                    geom_ids[f'{g}-feet_vec_{leg_name}'] = render_vector(
-                        rec_env.viewer,
-                        vector=feet_vel[leg_name][frame],
-                        pos=feet_pos[leg_name][frame],
-                        scale=np.linalg.norm(feet_vel[leg_name][frame]) * 0.5,
-                        color=np.array([0.9, 0.1, 0.1, 0.5]),
-                        geom_id=geom_ids.get(f'{g}-feet_vec_{leg_name}', -1),
-                    )
+                    # geom_ids[f'{g}-feet_vec_{leg_name}'] = render_vector(
+                    #     rec_env.viewer,
+                    #     vector=feet_vel[leg_name][frame],
+                    #     pos=feet_pos[leg_name][frame],
+                    #     scale=np.linalg.norm(feet_vel[leg_name][frame]) * 0.5,
+                    #     color=np.array([0.9, 0.1, 0.1, 0.5]),
+                    #     geom_id=geom_ids.get(f'{g}-feet_vec_{leg_name}', -1),
+                    # )
 
             rec_env.render(ghost_qpos=[G_obs_t['qpos'][g][frame] for g in G.elements[1:]], ghost_alpha=0.5)
             frame += 1
@@ -121,8 +120,7 @@ def reproduce_dataset(dataset):
 
 if __name__ == '__main__':
     path = pathlib.Path(
-        '/home/danfoa/Projects/Quadruped-PyMPC/datasets/forward+rotate/go1/terrain=perlin/lin_vel=(2.0, 0.0) '
-        'ang_vel=(-0.5, 0.5) friction=(0.9, 1.0)/ep=25_steps=1249.h5'
+        '/home/danfoa/Projects/Quadruped-PyMPC/datasets/forward+rotate/mini_cheetah/terrain=perlin/lin_vel=(0.0, 3.0) ang_vel=(-0.5, 0.5) friction=(0.9, 1.0)/ep=50_steps=1249.h5'
     )
     dataset = H5Reader(path)
 
