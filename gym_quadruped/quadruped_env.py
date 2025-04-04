@@ -57,7 +57,9 @@ FEET_OBS = [
     'feet_pos',
     'feet_pos:base',
     'feet_vel',
+    'feet_vel_rel',
     'feet_vel:base',
+    'feet_vel_rel:base',
     'contact_state',
     'contact_forces',
     'contact_forces:base',
@@ -612,25 +614,55 @@ class QuadrupedEnv(gym.Env):
             RL=homogenous_transform(self.mjData.geom_xpos[self._feet_geom_id.RL], X),
         )
 
-    def feet_vel(self, frame='world') -> LegsAttr:
-        """Get the feet velocities in the specified frame.
+    def feet_vel(self, frame: str = 'world', relative: bool = False) -> LegsAttr:
+        """Returns each foot's linear velocity in either the world frame or the base frame.
 
-        The feet velocities are computed using the Jacobians of the feet positions and the joint velocities.
+        If `relative=True`, we subtract off the base's linear velocity. If you also set
+        `account_for_base_rotation=True`, we further subtract the cross product
+        omega_base x (p_foot - p_base), meaning you get the full relative velocity
+        as seen by the base (translating + rotating).
 
         Args:
-        ----
-            frame: Either 'world' or 'base'. The reference frame in which the feet velocities are computed.
+            frame (str): "world" or "base".
+                - "world": velocity is expressed in world coordinates.
+                - "base":  velocity is expressed in the base's coordinate axes.
+            relative (bool):
+                - If False: The feet velocity includes the base linear and angular velocity components
+                - If True: The feet velocity is expressed relative to the moving base frame, hence the linear and
+                angular velocity components of the feet velocity due to the base linear and angular velocities are
+                subtracted.
 
         Returns:
-        -------
-            LegsAttr: A dictionary-like object with:
-                - FR: (3,) velocity of the FR foot in the specified frame.
-                - FL: (3,) velocity of the FL foot in the specified frame.
-                - RR: (3,) velocity of the RR foot in the specified frame.
-                - RL: (3,) velocity of the RL foot in the specified frame.
+            A LegsAttr object with each foot velocity as a (3,)-shaped array.
         """
-        feet_jac = self.feet_jacobians(frame=frame)
-        return LegsAttr(**{leg_name: feet_jac[leg_name] @ self.mjData.qvel for leg_name in self.legs_order})
+        feet_jac_world = self.feet_jacobians(frame='world')
+
+        # For each foot, multiply to get the foot velocity in world
+        foot_pos_w = self.feet_pos(frame='world')  # foot position in world
+        base_pos_w = self.base_pos  # base origin in world (3,)
+
+        base_lin_vel_w = self.mjData.qvel[0:3]
+        base_ang_vel_w = self.mjData.qvel[3:6]
+
+        feet_vel = {}
+        for leg_name in self.legs_order:
+            # foot velocity in world
+            foot_vel_w = feet_jac_world[leg_name] @ self.mjData.qvel
+            if relative:
+                # Subtract base's linear velocity
+                foot_vel_w -= base_lin_vel_w
+                # Subtract base_ang_vel x (r_foot - r_base)
+                cross_term = np.cross(base_ang_vel_w, foot_pos_w[leg_name] - base_pos_w)
+                foot_vel_w -= cross_term
+            feet_vel[leg_name] = foot_vel_w
+
+        # If final result is needed in the base frame, rotate from world -> base
+        if frame == 'base':
+            R_B_w = self.base_configuration[0:3, 0:3]  # rotation world->base
+            for leg_name in self.legs_order:
+                feet_vel[leg_name] = R_B_w.T @ feet_vel[leg_name]
+
+        return LegsAttr(**feet_vel)
 
     def feet_jacobians(self, frame: str = 'world', return_rot_jac: bool = False) -> LegsAttr | tuple[LegsAttr, ...]:
         """Compute the Jacobians of the feet positions.
@@ -1029,8 +1061,14 @@ class QuadrupedEnv(gym.Env):
                 obs_val = self.base_configuration[0:3, 0:3].flatten().copy()
             elif 'feet_pos' in obs_name:
                 obs_val = np.concatenate(self.feet_pos(frame).to_list(order=self.legs_order), axis=0).copy()
+            elif 'feet_vel_rel' in obs_name:
+                obs_val = np.concatenate(
+                    self.feet_vel(frame, relative=True).to_list(order=self.legs_order), axis=0
+                ).copy()
             elif 'feet_vel' in obs_name:
-                obs_val = np.concatenate(self.feet_vel(frame).to_list(order=self.legs_order), axis=0).copy()
+                obs_val = np.concatenate(
+                    self.feet_vel(frame, relative=False).to_list(order=self.legs_order), axis=0
+                ).copy()
             elif obs_name == 'contact_state':
                 contact_state, _ = self.feet_contact_state()
                 obs_val = np.array(contact_state.to_list(), dtype=np.float32).copy()
@@ -1227,7 +1265,7 @@ if __name__ == '__main__':
     scene_name = 'perlin'
     state_observables_names = tuple(QuadrupedEnv.ALL_OBS)
     env = QuadrupedEnv(
-        robot='mini_cheetah',
+        robot=robot_name,
         scene=scene_name,
         ref_base_lin_vel=(0.5, 1.0),  # pass a float for a fixed value
         ground_friction_coeff=(0.2, 1.5),  # pass a float for a fixed value
