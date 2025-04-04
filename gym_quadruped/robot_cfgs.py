@@ -8,7 +8,7 @@ import numpy as np
 class RobotConfig:
     """Base class of a quadruped robot configuration."""
 
-    urdf_filename: str
+    mjcf_filename: str
     hip_height: float  # height of the hip joint in normal stand pose
     qpos0_js: Optional[Iterable] = None  # Zero position of the joint-space configuration
     # Contact points / feet geometries ___________________________________________
@@ -32,20 +32,22 @@ def get_robot_config(robot_name: str) -> RobotConfig:
     """Get the robot configuration based on the robot name."""
     name = robot_name.lower()
 
-    if name == 'mini_cheetah':
+    if 'mini_cheetah' in name:
         cfg = RobotConfig(
-            urdf_filename='mini_cheetah.urdf', hip_height=0.225, qpos0_js=[0, -np.pi / 2, 0] * 2 + [0, np.pi / 2, 0] * 2
+            mjcf_filename='mini_cheetah/mini_cheetah.xml',
+            hip_height=0.225,
+            qpos0_js=[0, -np.pi / 2, 0] * 2 + [0, np.pi / 2, 0] * 2,
         )
     elif name == 'go1':
-        cfg = RobotConfig(urdf_filename='go1.urdf', hip_height=0.3)
+        cfg = RobotConfig(mjcf_filename='go1/go1.xml', hip_height=0.3)
     elif name == 'go2':
-        cfg = RobotConfig(urdf_filename='go2.urdf', hip_height=0.28)
+        cfg = RobotConfig(mjcf_filename='go2/go2.xml', hip_height=0.28)
     elif name == 'aliengo':
-        cfg = RobotConfig(urdf_filename='aliengo.urdf', hip_height=0.35)
+        cfg = RobotConfig(mjcf_filename='aliengo/aliengo.xml', hip_height=0.35)
     elif name == 'b2':
-        cfg = RobotConfig(urdf_filename='b2.urdf', hip_height=0.485)
-    elif name == 'hyqreal':
-        cfg = RobotConfig(urdf_filename='hyqreal.urdf', hip_height=0.5)
+        cfg = RobotConfig(mjcf_filename='b2/b2.xml', hip_height=0.485)
+    elif 'hyqreal' in name:
+        cfg = RobotConfig(mjcf_filename='hyqreal/hyqreal.xml', hip_height=0.5)
     else:
         raise ValueError(f'Unknown robot name: {robot_name}')
 

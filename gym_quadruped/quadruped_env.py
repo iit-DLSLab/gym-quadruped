@@ -145,7 +145,7 @@ class QuadrupedEnv(gym.Env):
 
         # Define the terrain/scene environment _______________________________________________________________
         dir_path = os.path.dirname(os.path.realpath(__file__))
-        base_path = Path(dir_path) / 'robot_model' / robot
+        base_path = Path(dir_path) / 'robot_model'
         procedural_assets_path = Path(dir_path) / 'utils' / 'mujoco' / 'assets'
         base_scene_env_path = base_path / f'scene_{scene}.xml'
         scene_env, self.terrain_limits = generate_terrain(
@@ -156,7 +156,7 @@ class QuadrupedEnv(gym.Env):
         try:  # to load the robot's model on custom terrain scene.
             root = scene_env.getroot()
             # Add include of the robot model
-            robot_xml_path = base_path / f'{robot}.xml'
+            robot_xml_path = base_path / self.robot_cfg.mjcf_filename
             assert robot_xml_path.exists(), f'Robot model file not found: {robot_xml_path.absolute()}'
             include = ET.Element('include')
             include.attrib['file'] = str(robot_xml_path.absolute().resolve())
@@ -331,6 +331,7 @@ class QuadrupedEnv(gym.Env):
                     ]
                 )
                 self.mjData.qpos[0:2] = xy_pos
+                self.mjData.qpos[2] = self.robot_cfg.hip_height
 
                 # Random orientation
                 roll_sweep = 10 * np.pi / 180 if 'roll_sweep' not in options else options['roll_sweep']
@@ -345,13 +346,6 @@ class QuadrupedEnv(gym.Env):
                     ],
                 ).as_quat(scalar_first=True)
                 self.mjData.qpos[3:7] = ori_wxyz
-
-                # try:
-                # 	feet_pos = self.feet_pos(frame='world')
-                # 	max_z = np.max([pos[2] for pos in feet_pos.to_list()])
-                # 	self.mjData.qpos[2] -= max_z
-                # except ValueError:
-                self.mjData.qpos[2] = self.robot_cfg.hip_height
 
             # Perform a forward dynamics computation to update the contact information
             mujoco.mj_step1(self.mjModel, self.mjData)
