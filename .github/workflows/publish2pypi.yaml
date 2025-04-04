@@ -11,9 +11,9 @@ name: Publish 2 PyPI
 on:
   push:
     branches:
-      - main    # Every push to main should trigger a release
-#  release:
-#    types: [published]
+      - master    # Every push to main should trigger a release
+  release:
+    types: [published]
 
 permissions:
   contents: read
