@@ -11,13 +11,15 @@ class RobotConfig:
     urdf_filename: str
     hip_height: float  # height of the hip joint in normal stand pose
     qpos0_js: Optional[Iterable] = None  # Zero position of the joint-space configuration
+    # Contact points / feet geometries ___________________________________________
     feet_geom_names: dict[str, str] = field(default_factory=lambda: {'FL': 'FL', 'FR': 'FR', 'RL': 'RL', 'RR': 'RR'})
+    # Joint names per leg.
     leg_joints: dict[str, list[str]] = field(
         default_factory=lambda: {
             'FL': ['FL_hip_joint', 'FL_thigh_joint', 'FL_calf_joint'],
             'FR': ['FR_hip_joint', 'FR_thigh_joint', 'FR_calf_joint'],
             'RL': ['RL_hip_joint', 'RL_thigh_joint', 'RL_calf_joint'],
-            'RR': ['RR_hip_joint', 'RR_calf_joint', 'RR_thigh_joint'],
+            'RR': ['RR_hip_joint', 'RR_thigh_joint', 'RR_calf_joint'],
         }
     )
     # IMU related parameters _______________________________________________________

@@ -33,6 +33,7 @@ dependencies = [
     "h5py",
     "gymnasium",
     "pytest",
+    "gym-quadruped>=1.0.2",
 ]
 
 [tool.ruff]

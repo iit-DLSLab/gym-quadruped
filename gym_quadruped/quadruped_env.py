@@ -1227,7 +1227,7 @@ class QuadrupedEnv(gym.Env):
 if __name__ == '__main__':
     from tqdm import tqdm
 
-    render = False
+    render = True
 
     robot_name = 'mini_cheetah'
     scene_name = 'perlin'
