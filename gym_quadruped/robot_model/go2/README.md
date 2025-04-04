@@ -18,8 +18,10 @@ description](https://github.com/unitreerobotics/unitree_ros/tree/master/robots/g
 
 1. Converted the DAE [mesh
    files](https://github.com/unitreerobotics/unitree_mujoco/tree/main/data/a1/meshes)
-to OBJ format using [Blender](https://www.blender.org/).
-  - When exporting, ensure "up axis" is `+Z`, and "forward axis" is `+Y`.
+   to OBJ format using [Blender](https://www.blender.org/).
+
+- When exporting, ensure "up axis" is `+Z`, and "forward axis" is `+Y`.
+
 2. Processed `.obj` files with [`obj2mjcf`](https://github.com/kevinzakka/obj2mjcf).
 3. Added `<mujoco> <compiler discardvisual="false" strippath="false" fusestatic="false"/> </mujoco>` to the URDF's
    `<robot>` clause in order to preserve visual geometries.

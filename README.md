@@ -46,20 +46,21 @@ for _ in range(10000):
 env.close()
 ```
 
-
 # Package-Name suggestions accepted
 
-The end idea of this package is to be able to have a Mujoco Gym Environment to test model-based and learnign controllers for locomotion in controlled environments with shared metrics (e.g., energy efficiency, robustness, etc.)
+The end idea of this package is to be able to have a Mujoco Gym Environment to test model-based and learnign controllers
+for locomotion in controlled environments with shared metrics (e.g., energy efficiency, robustness, etc.)
 
 The core principles should be:
- 
- - We (will) use `robot_descriptions.py` to load the robot URDF/SDF files and create the Mujoco model.
- - We programatically generate terrains and obstacles to test the robot in different scenarios.
- - We offer a suit of metrics to evaluate and compare the performance of different controllers with a simple API.
- - THIS IS A LIGHTWEIGHT PACKAGE. all custom stuff should be defined elsewhere. 
- - We will publish datasets of expert model-based/learning controlled trajectories using LeRobot (project structure inherited from them) and Huggingface API.
 
-At some point we should generate mujoco jax versions of the environments for simulation and data-collection in GPU. 
+- We (will) use `robot_descriptions.py` to load the robot URDF/SDF files and create the Mujoco model.
+- We programatically generate terrains and obstacles to test the robot in different scenarios.
+- We offer a suit of metrics to evaluate and compare the performance of different controllers with a simple API.
+- THIS IS A LIGHTWEIGHT PACKAGE. all custom stuff should be defined elsewhere.
+- We will publish datasets of expert model-based/learning controlled trajectories using LeRobot (project structure
+  inherited from them) and Huggingface API.
+
+At some point we should generate mujoco jax versions of the environments for simulation and data-collection in GPU.
 
 ```
 Death to C++
