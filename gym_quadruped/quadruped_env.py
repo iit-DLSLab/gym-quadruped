@@ -888,6 +888,18 @@ class QuadrupedEnv(gym.Env):
             RR=self.mjData.qfrc_bias[self.legs_qvel_idx.RR],
         )
         return legs_qfrc_bias
+    
+    @property
+    def legs_qfrc_passive(self):
+        """Gets the passive forces acting on the legs, e.g. friction."""
+        # passive forces
+        legs_qfrc_passive = LegsAttr(
+            FL=self.mjData.qfrc_passive[self.legs_qvel_idx.FL],
+            FR=self.mjData.qfrc_passive[self.legs_qvel_idx.FR],
+            RL=self.mjData.qfrc_passive[self.legs_qvel_idx.RL],
+            RR=self.mjData.qfrc_passive[self.legs_qvel_idx.RR],
+        )
+        return legs_qfrc_passive
 
     @property
     def com(self):
