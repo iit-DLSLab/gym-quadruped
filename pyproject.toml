@@ -27,7 +27,7 @@ dependencies = [
     "numpy",
     "scipy>=1.15.1",
     "robot_descriptions",
-    "mujoco>=3.3.0",
+    "mujoco>=3.3.1",
     "noise",
     "opencv-python",
     "h5py",
