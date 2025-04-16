@@ -325,19 +325,22 @@ def configure_observation_space(mj_model: mujoco.MjModel, obs_names: Sequence[st
     return observation_space
 
 
-def configure_observation_space_representations(robot_name: str, obs_names: Sequence[str]) -> dict[str, slice]:
+def configure_observation_space_representations(
+    robot_name: str, obs_names: Sequence[str], **load_symm_kwargs
+) -> dict[str, slice]:
     """Configures the observation space for the environment based on the provided state observation names.
 
     This function loads the group representations associated with the robot and assigns the corresponding group
     representations to each of the observations available in the `QuadrupedEnv`.
 
     Args:
-            robot_name:  (str): The name of the robot.
-            obs_names:  (list[str]): A list of state observation names based on which the observation space is
+        robot_name:  (str): The name of the robot.
+        obs_names:  (list[str]): A list of state observation names based on which the observation space is
+        load_symm_kwargs: d
 
     Returns:
-            obs_reps: (dict[str, Representation]): A dictionary with the group representations associated with each
-                    observation name.
+        obs_reps: (dict[str, Representation]): A dictionary with the group representations associated with each
+                observation name.
     """
     try:
         from morpho_symm.utils.rep_theory_utils import escnn_representation_form_mapping
@@ -345,26 +348,31 @@ def configure_observation_space_representations(robot_name: str, obs_names: Sequ
     except ImportError as e:
         raise ImportError('morpho_symm package is required to configure observation group representations') from e
 
-    G = load_symmetric_system(robot_name=robot_name, return_robot=False)
-    rep_Q_js = G.representations['Q_js']  # Representation on joint space position coordinates
-    rep_TqQ_js = G.representations['TqQ_js']  # Representation on joint space velocity coordinates
-    rep_Rd = G.representations['R3']  # Representation on vectors in R^d
-    rep_Rd_pseudo = G.representations['R3_pseudo']  # Representation on pseudo vectors in R^d
-    rep_euler_xyz = G.representations['euler_xyz']  # Representation on Euler angles
-    # TODO: Ensure the limb order in the configuration matches the used order by quadruped gym.
-    rep_kin_three = G.representations['kin_chain']  # Permutation of legs
-    rep_Rd_on_limbs = rep_kin_three.tensor(rep_Rd)  # Representation on signals R^d on the limbs
-    rep_Rd_on_limbs.name = 'Rd_on_limbs'
-    rep_Rd_pseudo_on_limbs = rep_kin_three.tensor(rep_Rd_pseudo)  # Representation on pseudo vect R^d on the limbs
-    rep_Rd_pseudo_on_limbs.name = 'Rd_pseudo_on_limbs'
-    rep_SO3_flat = {}
-    for h in G.elements:
-        rep_SO3_flat[h] = np.kron(rep_Rd(h), rep_Rd(~h).T)
-    rep_SO3_flat = escnn_representation_form_mapping(G, rep_SO3_flat)
-    rep_SO3_flat.name = 'SO3_flat'
-
-    # Create a representation for the z dimension alone of the base position
-    rep_z = escnn_representation_form_mapping(G, {g: rep_Rd(g)[2:3, 2:3] for g in G.elements}, name='base_z')
+    G = load_symmetric_system(robot_name=robot_name, return_robot=False, **load_symm_kwargs)
+    try:
+        rep_Q_js = G.representations['Q_js']  # Representation on joint space position coordinates
+        rep_TqQ_js = G.representations['TqQ_js']  # Representation on joint space velocity coordinates
+        rep_Rd = G.representations['R3']  # Representation on vectors in R^d
+        rep_Rd_pseudo = G.representations['R3_pseudo']  # Representation on pseudo vectors in R^d
+        rep_euler_xyz = G.representations['R3_pseudo']  # Representation on Euler angles
+        # TODO: Ensure the limb order in the configuration matches the used order by quadruped gym.
+        rep_kin_three = G.representations['kin_chain']  # Permutation of legs
+        rep_Rd_on_limbs = rep_kin_three.tensor(rep_Rd)  # Representation on signals R^d on the limbs
+        rep_Rd_on_limbs.name = 'Rd_on_limbs'
+        rep_Rd_pseudo_on_limbs = rep_kin_three.tensor(rep_Rd_pseudo)  # Representation on pseudo vect R^d on the limbs
+        rep_Rd_pseudo_on_limbs.name = 'Rd_pseudo_on_limbs'
+        rep_SO3_flat = {}
+        for h in G.elements:
+            rep_SO3_flat[h] = np.kron(rep_Rd(h), rep_Rd(~h).T)
+        rep_SO3_flat = escnn_representation_form_mapping(G, rep_SO3_flat)
+        rep_SO3_flat.name = 'SO3_flat'
+        # Create a representation for the z dimension alone of the base position
+        rep_z = escnn_representation_form_mapping(G, {g: rep_Rd(g)[2:3, 2:3] for g in G.elements}, name='base_z')
+    except KeyError as e:
+        raise KeyError(
+            f'Group rep for {e.args[0]} missing from robot {robot_name} configuration. '
+            f'Available reps: {list(G.representations.keys())}'
+        ) from e
     # rep_roll = escnn_representation_form_mapping(
     # 	G, {g: rep_Rd_pseudo(g)[0:1, 0:1] for g in G.elements}, name='base_roll'
     # )
