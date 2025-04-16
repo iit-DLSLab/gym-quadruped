@@ -1,6 +1,6 @@
 # Mujoco Gym Environment for quadupedal legged locomotion
 
-[![PyPI version](https://img.shields.io/pypi/v/gym-quadruped.svg)](https://pypi.org/project/morpho-symm/) [![Python Version](https://img.shields.io/badge/python-3.10%20--%203.12-blue)](https://github.com/Danfoa/MorphoSymm/actions/workflows/tests.yaml)
+[![PyPI version](https://img.shields.io/pypi/v/gym-quadruped.svg)](https://pypi.org/project/gym-quadruped/) [![Python Version](https://img.shields.io/badge/python-3.10%20--%203.12-blue)](https://github.com/Danfoa/MorphoSymm/actions/workflows/tests.yaml)
 
 # Install Instructions
 
