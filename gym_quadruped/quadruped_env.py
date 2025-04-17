@@ -328,8 +328,8 @@ class QuadrupedEnv(gym.Env):
 
                 xy_pos = np.array(
                     [
-                        np.random.uniform(-self.terrain_limits[0] * (3 / 4), self.terrain_limits[0] * (3 / 4)),
-                        np.random.uniform(-self.terrain_limits[1] * (3 / 4), self.terrain_limits[1] * (3 / 4)),
+                        np.random.uniform(self.terrain_limits[0], self.terrain_limits[1]),
+                        np.random.uniform(self.terrain_limits[2], self.terrain_limits[3]),
                     ]
                 )
                 self.mjData.qpos[0:2] = xy_pos
@@ -1140,8 +1140,8 @@ class QuadrupedEnv(gym.Env):
 
     def _check_out_of_terrain_bounds(self) -> bool:
         """Env termination occurs when the robot is outside the environment."""
-        return np.abs(self.base_pos[0]) > self.terrain_limits[0] or np.abs(self.base_pos[1]) > self.terrain_limits[1]
-
+        return self.base_pos[0] > self.terrain_limits[0] or self.base_pos[0] < self.terrain_limits[1] or self.base_pos[1] > self.terrain_limits[2] or self.base_pos[1] < self.terrain_limits[3]
+    
     def _get_geom_body_info(self, geom_name: str = None, geom_id: int = None) -> [int, str]:
         """Returns the body ID and name associated with the geometry name or ID."""
         assert geom_name is not None or geom_id is not None, 'Please provide either the geometry name or ID.'
