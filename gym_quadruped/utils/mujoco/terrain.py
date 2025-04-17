@@ -318,7 +318,7 @@ def generate_terrain(
     with local_seed(seed):
         if base_scene_env_path.exists():
             scene_env = ET.parse(base_scene_env_path)
-            terrain_limits = (np.inf, np.inf)
+            terrain_limits = (np.inf, np.inf, np.inf, np.inf)
         else:  # Procedurally generated terrain types. Scaling to the robot's hip height.
             base_scene_env_path = procedural_assets_path / 'scene_flat.xml'
 
@@ -357,7 +357,7 @@ def generate_terrain(
                 )
             elif terrain_name == 'flat':
                 scene_env = ET.parse(base_scene_env_path)
-                terrain_limits = (10000, 10000)
+                terrain_limits = (10000, -10000, 10000, -10000)
             else:
                 raise ValueError(
                     f'Invalid scene name: {terrain_name}, available are: random_boxes, random_pyramids, perlin'
