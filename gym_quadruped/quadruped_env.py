@@ -281,6 +281,13 @@ class QuadrupedEnv(gym.Env):
         info = {'time': self.mjData.time, 'step_num': self.step_num, 'invalid_contacts': contact_info}
 
         self.step_num += 1
+
+        if 'reset' in self.base_vel_command_type:
+            self.step_num_after_reset += 1
+            if self.step_num_after_reset >= self.step_num_before_reset:
+                self._sample_ref_vel()
+
+
         return obs, reward, is_terminated, is_truncated, info
 
     def reset(
@@ -374,27 +381,8 @@ class QuadrupedEnv(gym.Env):
         mujoco.mj_step(self.mjModel, self.mjData)
 
         # Reset the desired base velocity command
-        # ----------------------------------------------------------------------
-        if 'forward' in self.base_vel_command_type:
-            base_vel_norm = np.random.uniform(*self.base_lin_vel_range, size=1)
-            base_heading_vel_vec = np.array([1, 0, 0])  # Move in the "forward" direction
-        elif 'random' in self.base_vel_command_type:
-            base_vel_norm = np.random.uniform(*self.base_lin_vel_range, size=1)
-            heading_angle = np.random.uniform(-np.pi, np.pi)
-            base_heading_vel_vec = np.array([np.cos(heading_angle), np.sin(heading_angle), 0])
-        elif 'human' in self.base_vel_command_type:
-            base_vel_norm = 0.0
-            base_heading_vel_vec = np.array([1, 0, 0])
-            self._ref_base_ang_yaw_dot = 0.0
-        else:
-            raise ValueError(f'Invalid base linear velocity command type: {self.base_vel_command_type}')
+        self._sample_ref_vel()
 
-        if 'rotate' in self.base_vel_command_type:
-            self._ref_base_ang_yaw_dot = np.random.uniform(*self.base_ang_vel_range)
-        else:
-            self._ref_base_ang_yaw_dot = 0.0
-
-        self._ref_base_lin_vel_H = base_vel_norm * base_heading_vel_vec
 
         # Ground friction coefficient randomization if enabled.
         tangential_friction = np.random.uniform(*self.ground_friction_coeff_range)
@@ -1028,6 +1016,35 @@ class QuadrupedEnv(gym.Env):
             robot_name=self.robot_name, obs_names=self.state_obs_names
         )
         return obs_reps
+    
+    def _sample_ref_vel(self) -> tuple[np.ndarray, np.ndarray]:
+        # Reset the desired base velocity command
+        # ----------------------------------------------------------------------
+        if 'forward' in self.base_vel_command_type:
+            base_vel_norm = np.random.uniform(*self.base_lin_vel_range, size=1)
+            base_heading_vel_vec = np.array([1, 0, 0])  # Move in the "forward" direction
+        elif 'random' in self.base_vel_command_type:
+            base_vel_norm = np.random.uniform(*self.base_lin_vel_range, size=1)
+            heading_angle = np.random.uniform(-np.pi, np.pi)
+            base_heading_vel_vec = np.array([np.cos(heading_angle), np.sin(heading_angle), 0])
+        elif 'human' in self.base_vel_command_type:
+            base_vel_norm = 0.0
+            base_heading_vel_vec = np.array([1, 0, 0])
+            self._ref_base_ang_yaw_dot = 0.0
+        else:
+            raise ValueError(f'Invalid base linear velocity command type: {self.base_vel_command_type}')
+
+        if 'rotate' in self.base_vel_command_type:
+            self._ref_base_ang_yaw_dot = np.random.uniform(*self.base_ang_vel_range)
+        else:
+            self._ref_base_ang_yaw_dot = 0.0
+
+        if 'reset' in self.base_vel_command_type:
+            self.step_num_after_reset = 0
+            self.step_num_before_reset = np.random.randint(1000, 3000)
+
+        self._ref_base_lin_vel_H = base_vel_norm * base_heading_vel_vec
+
 
     def _compute_reward(self):
         # Example reward function (to be defined based on the task)
