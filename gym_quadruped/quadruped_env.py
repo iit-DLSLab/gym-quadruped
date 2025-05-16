@@ -1093,6 +1093,7 @@ class QuadrupedEnv(gym.Env):
         self._external_disturbance_pitch = 0.0
         self._external_disturbance_yaw = 0.0
 
+        # We check first if the external disturbances are set or not
         if "x" in self.external_disturbances_kwargs:
             x_range = self.external_disturbances_kwargs["x"]
             if len(x_range) == 1:
@@ -1139,7 +1140,6 @@ class QuadrupedEnv(gym.Env):
         self._external_disturbances = np.array([self._external_disturbance_x, self._external_disturbance_y, self._external_disturbance_z,
                                                 self._external_disturbance_roll, self._external_disturbance_pitch, self._external_disturbance_yaw])
 
-        print("self._external_disturbances", self._external_disturbances)
 
     def _compute_reward(self):
         # Example reward function (to be defined based on the task)
