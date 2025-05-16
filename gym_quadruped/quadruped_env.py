@@ -95,7 +95,7 @@ class QuadrupedEnv(gym.Env):
         legs_order: tuple[str, str, str, str] = ('FL', 'FR', 'RL', 'RR'),
         sensors: tuple[{Sensor}, ...] = None,  # Class names of Sensor instances
         sensors_kwargs: tuple[dict[str, Any]] = None,
-        external_disturbances_kwargs: tuple[dict[str, Any]] = None,
+        external_disturbances_kwargs: dict[str, Any] = None,
     ):
         """Initialize the quadruped environment.
 
