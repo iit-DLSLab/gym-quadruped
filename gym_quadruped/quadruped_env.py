@@ -303,12 +303,7 @@ class QuadrupedEnv(gym.Env):
                 self._sample_external_disturbances()
             
             # Apply external disturbances to the robot
-            self.mjData.qfrc_applied[0] = self._external_disturbances[0]
-            self.mjData.qfrc_applied[1] = self._external_disturbances[1]
-            self.mjData.qfrc_applied[2] = self._external_disturbances[2]
-            self.mjData.qfrc_applied[3] = self._external_disturbances[3]
-            self.mjData.qfrc_applied[4] = self._external_disturbances[4]
-            self.mjData.qfrc_applied[5] = self._external_disturbances[5]
+            self.mjData.qfrc_applied[:6] = self._external_disturbances[:6]
 
 
 
