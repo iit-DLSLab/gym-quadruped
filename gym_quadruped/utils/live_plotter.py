@@ -86,6 +86,8 @@ class MujocoPlotter:
 
     def torque_plot(self, legs: list = None, joint_names: list = None, window_size: int = 50, enable: bool = True):  # noqa: D102
         if enable is False or self.all_plot_enable is False:
+            self.torque_legs = None
+            self.torque_joint_names = None
             return
         self.torque_legs, self.torque_joint_names = self.predefined_plot(
             name='Torque',
@@ -97,6 +99,8 @@ class MujocoPlotter:
 
     def jointpos_plot(self, legs: list = None, joint_names: list = None, window_size: int = 50, enable: bool = True):  # noqa: D102
         if enable is False or self.all_plot_enable is False:
+            self.jp_legs = None
+            self.jp_joint_names = None
             return
         self.jp_legs, self.jp_joint_names = self.predefined_plot(
             name='JointPos',
@@ -108,6 +112,8 @@ class MujocoPlotter:
 
     def jointvel_plot(self, legs: list = None, joint_names: list = None, window_size: int = 50, enable: bool = True):  # noqa: D102
         if enable is False or self.all_plot_enable is False:
+            self.jv_legs=None
+            self.jv_joint_names = None
             return
         self.jv_legs, self.jv_joint_names = self.predefined_plot(
             name='JointVel',
@@ -119,6 +125,7 @@ class MujocoPlotter:
 
     def footContact_plot(self, legs: list = None, joint_names: list = None, window_size: int = 50, enable: bool = True):  # noqa: D102
         if enable is False or self.all_plot_enable is False:
+            self.contact_legs=None
             return
         self.contact_legs, _ = self.predefined_plot(
             name='FootContacts',
@@ -159,6 +166,8 @@ class MujocoPlotter:
         )
 
     def predefine_update(self, name, data, selected_legs, selected_joints, legs_attr=False):
+        if self.all_plot_enable is False: return 
+        if selected_legs is None: return 
         """TODO: Docstring required."""
         if legs_attr:
             data = [value for arr in data.to_list() for value in arr]  # convert LegArray to list
@@ -347,7 +356,7 @@ class MultiLivePlotter(mp.Process):
             self._update_data(new_values)
         return self._update_plot()
 
-    def update_data(self, new_values):
+    def _update_data(self, new_values):
         """Update the data buffers with new values.
 
         Args:
