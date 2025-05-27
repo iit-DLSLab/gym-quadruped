@@ -5,6 +5,10 @@ on:
     branches:
       - main
       - devel
+  pull_request:
+    branches:
+      - main
+      - devel
   workflow_dispatch:
   schedule:
     - cron: '0 0 * * 0'  # Runs every week at midnight on Sunday
