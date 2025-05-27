@@ -101,7 +101,22 @@ def add_perlin_heightfield(
     geo.attrib['quat'] = list_to_str(quat_wxyz)
     geo.attrib['material'] = 'groundplane'  # Add the material attribute
 
-    return scene_env, (size[0] / 2, size[1] / 2)
+    # center of the area
+    center = (position[0], position[1])
+    max_abs_x = size[0]/2.
+    max_abs_y = size[1]/2.
+    max_x = size[0]/2.
+    max_y = size[1]/2.
+
+    # create a radius to spawn the robot at a safe distance
+    if max_abs_x >= max_abs_y:
+        radius = 0.8*np.sqrt((max_x - center[0]) * (max_x - center[0]))
+    else:
+        radius = 0.8*np.sqrt((max_y - center[1]) * (max_y - center[1]))
+
+    terrain_limit = (center[0] + radius, center[0] - radius, center[1] + radius, center[1] - radius)
+
+    return scene_env, terrain_limit
 
 
 # Add Box to scene
@@ -218,8 +233,10 @@ def add_world_of_boxes(
         radius = 1.2 * np.sqrt(2 * (max_x - center[0]) * (max_x - center[0]))
     else:
         radius = 1.2 * np.sqrt(2 * (max_y - center[1]) * (max_y - center[1]))
-
-    return scene, radius, center
+    
+    
+    terrain_limit = (center[0] + radius, center[0] - radius, center[1] + radius, center[1] - radius)
+    return scene, terrain_limit
 
 
 def add_world_of_pyramid(
@@ -252,6 +269,9 @@ def add_world_of_pyramid(
         new_width = width - stride_rand[0] * i
         new_length = length - stride_rand[0] * i
 
+        if(new_width < 0.3 or new_length < 0.3):
+            break
+
         add_box(
             asset,
             worldbody,
@@ -268,11 +288,12 @@ def add_world_of_pyramid(
 
     # create a radius to spawn the robot at a safe distance
     if max_abs_x >= max_abs_y:
-        radius = 1.2 * np.sqrt(2 * (max_abs_x - center[0]) * (max_abs_x - center[0]))
+        radius = 1.5 * np.sqrt(2 * (max_abs_x - center[0]) * (max_abs_x - center[0]))
     else:
-        radius = 1.2 * np.sqrt(2 * (max_abs_y - center[1]) * (max_abs_y - center[1]))
-
-    return scene, radius, center
+        radius = 1.5 * np.sqrt(2 * (max_abs_y - center[1]) * (max_abs_y - center[1]))
+    
+    terrain_limit = (center[0] + radius, center[0] - radius, center[1] + radius, center[1] - radius)
+    return scene, terrain_limit
 
 
 # For info on contextlib, see https://docs.python.org/3/library/contextlib.html
@@ -297,12 +318,12 @@ def generate_terrain(
     with local_seed(seed):
         if base_scene_env_path.exists():
             scene_env = ET.parse(base_scene_env_path)
-            terrain_limits = (np.inf, np.inf)
+            terrain_limits = (np.inf, np.inf, np.inf, np.inf)
         else:  # Procedurally generated terrain types. Scaling to the robot's hip height.
             base_scene_env_path = procedural_assets_path / 'scene_flat.xml'
 
             if terrain_name == 'random_boxes':
-                scene_env, _, terrain_limits = add_world_of_boxes(
+                scene_env, terrain_limits = add_world_of_boxes(
                     base_scene_env_path,
                     init_pos=[0.5, -3.0, 0.02],
                     euler=[0, 0, 0.0],
@@ -314,13 +335,13 @@ def generate_terrain(
                     random_roll_pitch=True,
                 )
             elif terrain_name == 'random_pyramids':
-                scene_env, _, terrain_limits = add_world_of_pyramid(
+                scene_env, terrain_limits = add_world_of_pyramid(
                     base_scene_env_path,
                     init_pos=[3, 0, 0.02],
                     width=10 * hip_height,
-                    max_height=10 * hip_height,
+                    max_height=5 * hip_height,
                     length=10 * hip_height,
-                    stair_nums=(10 * hip_height) / (hip_height / 4),
+                    stair_nums=np.random.uniform(2, 8, 1),
                 )
             elif terrain_name == 'perlin':
                 scene_env, terrain_limits = add_perlin_heightfield(
@@ -336,7 +357,7 @@ def generate_terrain(
                 )
             elif terrain_name == 'flat':
                 scene_env = ET.parse(base_scene_env_path)
-                terrain_limits = (10000, 10000)
+                terrain_limits = (10000, -10000, 10000, -10000)
             else:
                 raise ValueError(
                     f'Invalid scene name: {terrain_name}, available are: random_boxes, random_pyramids, perlin'
