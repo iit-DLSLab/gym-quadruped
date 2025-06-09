@@ -1,5 +1,5 @@
 <mujoco model="aliengo_description">
-    <compiler angle="radian" meshdir="assets" autolimits="true"/>
+    <compiler angle="radian" autolimits="true"/>
 
     <default>
         <joint damping="0.6" armature="0.01" frictionloss="0.2"/>
