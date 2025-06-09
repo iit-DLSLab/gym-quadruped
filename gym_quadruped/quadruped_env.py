@@ -524,11 +524,11 @@ class QuadrupedEnv(gym.Env):
 
     def base_ang_vel(self, frame='world'):
         """Returns the base angular velocity (3,) in the specified frame."""
-        if frame == 'world':
+        if frame == 'base':
             return self.mjData.qvel[3:6]
-        elif frame == 'base':
+        elif frame == 'world':
             R = self.base_configuration[0:3, 0:3]
-            return R.T @ self.mjData.qvel[3:6]
+            return R @ self.mjData.qvel[3:6]
         else:
             raise ValueError(f"Invalid frame: {frame} != 'world' or 'base'")
 
