@@ -11,33 +11,13 @@ Date      	By	Comments
 
 from gym_quadruped.quadruped_env import QuadrupedEnv
 from gym_quadruped.sensors.imu import IMU
+from gym_quadruped.robot_cfgs import RobotConfig, get_robot_config
 
 robot_name = 'aliengo'  # "aliengo", "mini_cheetah", "go2", "hyqreal", ...
-scene_name = 'flat'
+scene_name = 'slippery' # "flat", "stairs", "ramp", "perlin", "random_boxes", "random_pyramids"
 
-robot_feet_geom_names = {'FL': 'FL', 'FR': 'FR', 'RL': 'RL', 'RR': 'RR'}
-robot_leg_joints = {
-    'FL': [
-        'FL_hip_joint',
-        'FL_thigh_joint',
-        'FL_calf_joint',
-    ],
-    'FR': [
-        'FR_hip_joint',
-        'FR_thigh_joint',
-        'FR_calf_joint',
-    ],
-    'RL': [
-        'RL_hip_joint',
-        'RL_thigh_joint',
-        'RL_calf_joint',
-    ],
-    'RR': [
-        'RR_hip_joint',
-        'RR_thigh_joint',
-        'RR_calf_joint',
-    ],
-}
+robot_cfg: RobotConfig = get_robot_config(robot_name=robot_name)
+robot_leg_joints = robot_cfg.leg_joints
 
 
 imu_kwargs = {
@@ -53,9 +33,6 @@ imu_kwargs = {
 state_observables_names = ('qpos', 'qvel') + tuple(IMU.ALL_OBS)  # return all available state observables
 env = QuadrupedEnv(
     robot=robot_name,
-    hip_height=0.25,
-    legs_joint_names=robot_leg_joints,  # Joint names of the legs DoF
-    feet_geom_name=robot_feet_geom_names,  # Geom/Frame id of feet
     scene=scene_name,
     ref_base_lin_vel=0.5,  # Constant magnitude of reference base linear velocity [m/s]
     base_vel_command_type='forward',  # "forward", "random", "forward+rotate", "human"

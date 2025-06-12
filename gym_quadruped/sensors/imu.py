@@ -134,7 +134,7 @@ class IMU(Sensor):
         gyro = self._mj_data.sensordata[gyro_id : gyro_id + 3]
 
         # add noise and biases to the real value
-        gyro += dt * self._imu_accel_bias + base_ang_vel_noise
+        gyro += dt * self._imu_gyro_bias + base_ang_vel_noise
 
         self._gyro_measurements = gyro, base_ang_vel_noise, self._imu_gyro_bias
 

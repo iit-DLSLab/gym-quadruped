@@ -124,8 +124,6 @@ class QuadrupedEnv(gym.Env):
                 coefficient is fixed. If a tuple, (min, max) the friction coefficient is uniformly sampled from this
             legs_order: (tuple) Default order of the legs in the state observation and action space. This order defines
                 how state observations of legs observables (e.g., feet positions) are ordered in the state vector.
-            feet_geom_name: (dict) Dict with keys FL, FR, RL, RR; and as values the name of the Mujoco geometry
-                (MjvGeom) associated with the feet/contact-point of each leg. Used to compute the ground contact forces.
             sensors: (tuple) Tuple with the class names of the sensors to add to the environment.
             sensors_kwargs: (tuple) Tuple with the kwargs to pass to the sensors constructors.
             external_disturbances_kwargs: (tuple) Tuple with the class names of the external disturbances to add to the environment.
@@ -526,11 +524,11 @@ class QuadrupedEnv(gym.Env):
 
     def base_ang_vel(self, frame='world'):
         """Returns the base angular velocity (3,) in the specified frame."""
-        if frame == 'world':
+        if frame == 'base':
             return self.mjData.qvel[3:6]
-        elif frame == 'base':
+        elif frame == 'world':
             R = self.base_configuration[0:3, 0:3]
-            return R.T @ self.mjData.qvel[3:6]
+            return R @ self.mjData.qvel[3:6]
         else:
             raise ValueError(f"Invalid frame: {frame} != 'world' or 'base'")
 
