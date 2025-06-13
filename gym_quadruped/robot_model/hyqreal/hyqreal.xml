@@ -6,7 +6,7 @@
 <!-- =================================================================================== -->
 
 <mujoco model="hyqreal">
-    <compiler angle="radian" autolimits="true" meshdir="assets"/>
+    <compiler angle="radian" autolimits="true"/>
     <option cone="elliptic" impratio="100"/>
     <size njmax="500" nconmax="100"/>
 
