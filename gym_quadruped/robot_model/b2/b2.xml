@@ -17,9 +17,10 @@
 
     <asset>
         <mesh name="base_link" file="assets/base_link.obj"/>
+        <!--mesh name="base_link_lidar" file="assets/base_link.obj"/-->
         <mesh name="logo_left" file="assets/logo_left.obj"/>
         <mesh name="logo_right" file="assets/logo_right.obj"/>
-        <mesh name="unitree_ladar" file="assets/unitree_ladar.obj"/>
+        <!--mesh name="unitree_ladar" file="assets/unitree_ladar.obj"/-->
         <mesh name="f_dc_link" file="assets/f_dc_link.obj"/>
         <mesh name="r_dc_link" file="assets/r_dc_link.obj"/>
         <mesh name="fake_imu_link" file="assets/fake_imu_link.STL"/>
@@ -49,6 +50,7 @@
         <mesh name="r_oc_link" file="assets/r_oc_link.obj"/>
     </asset>
     <worldbody>
+        
         <body name="base_link" pos="0 0 0.8" childclass="b2">
             <inertial pos="0.0212868 0.0045819 0.0106169" quat="0.00178111 0.675412 -0.000262894 0.737438"
                       mass="40.8426" diaginertia="1.73786 1.66448 0.343734"/>
@@ -57,9 +59,12 @@
             <geom size="0.25 0.14 0.075" type="box" rgba="0.7 0.7 0.7 1" class="collision"/>
             <geom type="mesh" contype="0" conaffinity="0" group="1" density="0" rgba="1 1 1 1" mesh="logo_left"/>
             <geom type="mesh" contype="0" conaffinity="0" group="1" density="0" rgba="1 1 1 1" mesh="logo_right"/>
-            <geom pos="0.34218 0 0.17851" type="mesh" contype="0" conaffinity="0" group="1" density="0"
-                  rgba="0.15 0.15 0.15 1" mesh="unitree_ladar"/>
-            <geom size="0.076 0.08" pos="0.34218 0 0.15851" type="cylinder" rgba="0.15 0.15 0.15 1" class="collision"/>
+            
+            <!-- modify this to add lidar -->
+            <!--geom pos="0.34218 0 0.17851" type="mesh" contype="0" conaffinity="0" group="1" density="0"
+                  rgba="0.15 0.15 0.15 1" mesh="unitree_ladar"/-->
+            <!--geom size="0.076 0.08" pos="0.34218 0 0.15851" type="cylinder" rgba="0.15 0.15 0.15 1" class="collision"/-->
+            
             <geom pos="0.841724 -4.57659e-06 0.130379" quat="0.00244632 3.13845e-06 0.999997 1.29099e-06" type="mesh"
                   contype="0" conaffinity="0" group="1" density="0" rgba="0 0 0 1" mesh="f_dc_link"/>
             <geom pos="-0.378319 0.000200109 -0.379902" quat="-1.30076e-06 -0.708662 5.35065e-07 0.705548" type="mesh"
