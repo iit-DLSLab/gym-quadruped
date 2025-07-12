@@ -68,7 +68,7 @@
             <geom type="mesh" contype="0" conaffinity="0" group="1" density="0" rgba="1 1 1 1" mesh="logo_left"/>
             <geom type="mesh" contype="0" conaffinity="0" group="1" density="0" rgba="1 1 1 1" mesh="logo_right"/>
             
-            <!-- modify this to add lidar -->
+            <!-- modify these to add lidar -->
             <!--geom pos="0.34218 0 0.17851" type="mesh" contype="0" conaffinity="0" group="1" density="0"
                   rgba="0.15 0.15 0.15 1" mesh="unitree_ladar"/-->
             <!--geom size="0.076 0.08" pos="0.34218 0 0.15851" type="cylinder" rgba="0.15 0.15 0.15 1" class="collision"/-->
