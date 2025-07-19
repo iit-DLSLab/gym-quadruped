@@ -207,7 +207,7 @@
         <motor name="FL_hip"   class="hip"    gear="1" joint="FL_hip_joint"/>
         <motor name="FL_thigh" class="thigh"  gear="1" joint="FL_thigh_joint"/>
         <motor name="FL_calf"  class="calf"   gear="1" joint="FL_calf_joint"/>
-         <motor name="FR_hip"   class="hip"    gear="1" joint="FR_hip_joint"/>
+        <motor name="FR_hip"   class="hip"    gear="1" joint="FR_hip_joint"/>
         <motor name="FR_thigh" class="thigh"  gear="1" joint="FR_thigh_joint"/>
         <motor name="FR_calf"  class="calf"   gear="1" joint="FR_calf_joint"/>
         <motor name="RL_hip"   class="hip"    gear="1" joint="RL_hip_joint"/>
@@ -236,7 +236,7 @@
         <jointvel name="FL_hip_vel"     joint="FL_hip_joint"/>
         <jointvel name="FL_thigh_vel"   joint="FL_thigh_joint"/>
         <jointvel name="FL_calf_vel"    joint="FL_calf_joint"/>
-         <jointvel name="FR_hip_vel"     joint="FR_hip_joint"/>
+        <jointvel name="FR_hip_vel"     joint="FR_hip_joint"/>
         <jointvel name="FR_thigh_vel"   joint="FR_thigh_joint"/>
         <jointvel name="FR_calf_vel"    joint="FR_calf_joint"/>
         <jointvel name="RL_hip_vel"     joint="RL_hip_joint"/>

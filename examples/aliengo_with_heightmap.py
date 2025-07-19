@@ -53,7 +53,7 @@ while True:
         if is_terminated:
             print('Environment terminated')
         else:
-            print(f'reset {env.reset_env_counter}')
+            print('Environment truncated')
             env.reset(random=False)
     env.render()
 env.close()

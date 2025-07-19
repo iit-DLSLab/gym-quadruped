@@ -218,14 +218,13 @@
 
 
     <actuator>
+        <motor name="FL_hip" ctrlrange="-173.0 173.0" joint="FL_hip_joint"/>
+        <motor name="FL_thigh" ctrlrange="-208 208" joint="FL_thigh_joint"/>
+        <motor name="FL_calf" ctrlrange="-249 249" joint="FL_calf_joint"/>
 
-        <motor name="FL_hip" ctrlrange="-173.0 173.0" joint="FR_hip_joint"/>
-        <motor name="FL_thigh" ctrlrange="-208 208" joint="FR_thigh_joint"/>
-        <motor name="FL_calf" ctrlrange="-249 249" joint="FR_calf_joint"/>
-
-        <motor name="FR_hip" ctrlrange="-173.0 173.0" joint="FL_hip_joint"/>
-        <motor name="FR_thigh" ctrlrange="-208 208" joint="FL_thigh_joint"/>
-        <motor name="FR_calf" ctrlrange="-249 249" joint="FL_calf_joint"/>
+        <motor name="FR_hip" ctrlrange="-173.0 173.0" joint="FR_hip_joint"/>
+        <motor name="FR_thigh" ctrlrange="-208 208" joint="FR_thigh_joint"/>
+        <motor name="FR_calf" ctrlrange="-249 249" joint="FR_calf_joint"/>
 
         <motor name="RL_hip" ctrlrange="-173.0 173.0" joint="RL_hip_joint"/>
         <motor name="RL_thigh" ctrlrange="-208 208" joint="RL_thigh_joint"/>
@@ -234,11 +233,11 @@
         <motor name="RR_hip" ctrlrange="-173.0 173.0" joint="RR_hip_joint"/>
         <motor name="RR_thigh" ctrlrange="-208 208" joint="RR_thigh_joint"/>
         <motor name="RR_calf" ctrlrange="-249 249" joint="RR_calf_joint"/>
-
     </actuator>
 
     <keyframe>
-        <key qpos='0 0 0.5 1 0 0 0 0 0.9 -1.7 0 0.9 -1.7 0 0.9 -1.7 0 0.9 -1.7'/>
+        <key name="home" qpos="0 0 0.498 1 0 0 0 0 0.9 -1.8 0 0.9 -1.8 0 0.9 -1.8 0 0.9 -1.8"
+                ctrl="0 0.9 -1.8 0 0.9 -1.8 0 0.9 -1.8 0 0.9 -1.8"/>
     </keyframe>
 </mujoco>
 
