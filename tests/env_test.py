@@ -11,7 +11,7 @@ logging.basicConfig(level=logging.DEBUG)
 logger = logging.getLogger(__name__)
 
 
-@pytest.mark.parametrize('robot_name', ['b2', 'go1', 'go2', 'hyqreal', 'mini_cheetah', 'aliengo'])
+@pytest.mark.parametrize('robot_name', ['b2', 'go1', 'go2', 'hyqreal1', 'hyqreal2', 'mini_cheetah', 'aliengo'])
 @pytest.mark.parametrize('terrain_type', ['flat', 'perlin'])
 def test_robot_env(robot_name, terrain_type):  # noqa: D103
     print(f'Testing robot {robot_name} on terrain {terrain_type}')
