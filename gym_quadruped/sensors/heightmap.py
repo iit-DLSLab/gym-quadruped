@@ -123,7 +123,7 @@ class HeightMap:
             c_rows = (self.num_rows - 1) / 2.
             additional_offset_rows = 0.0
         
-        if(self.num_cols % 2 == 0):
+        if self.num_cols % 2 == 0:
             c_cols = (self.num_cols) / 2.
             additional_offset_cols = -self.dist_y / 2.0
         else:
