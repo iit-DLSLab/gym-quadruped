@@ -1,4 +1,4 @@
-<mujoco model="go1">
+<mujoco model="go1_description">
     <compiler angle="radian" autolimits="true"/>
 
     <option cone="elliptic" impratio="100"/>
