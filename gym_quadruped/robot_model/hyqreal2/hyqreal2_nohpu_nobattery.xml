@@ -23,7 +23,7 @@
 
   <worldbody>
     <body name="base">
-      <inertial pos="0.0015 0.0019 -0.0014" quat="-0.0153338 0.706671 -0.0152992 0.70721" mass="83.07" diaginertia="9.46 9.36 2.42"/>
+      <inertial pos="0.0015 0.0019 -0.0014" quat="-0.0153338 0.706671 -0.0152992 0.70721" mass="47.52" diaginertia="6.95 6.64 1.74"/>
       <joint name="floating_base" type="free" limited="false" actuatorfrclimited="false"/>
     
       <!-- base visual and collision -->
