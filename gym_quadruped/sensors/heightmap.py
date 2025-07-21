@@ -132,7 +132,7 @@ class HeightMap:
 
         
         # fill the elements based on a and b
-        # the first loop is for the rows andthe second loop is for the columns
+        # the first loop is for the rows and the second loop is for the columns
         # the x and y are filled base on a and b for the sensor position z is the same for all sensors
         for i in range(self.num_rows):
             p = c_rows - i
