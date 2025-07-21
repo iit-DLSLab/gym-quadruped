@@ -5,7 +5,7 @@
 <!-- |    @author : Siddharth Deore (sidddharth.deore@iit.it)                          | -->
 <!-- =================================================================================== -->
 
-<mujoco model="hyqreal">
+<mujoco model="hyqreal1_description">
     <compiler angle="radian" autolimits="true"/>
     <option cone="elliptic" impratio="100"/>
     <size njmax="500" nconmax="100"/>

@@ -1,4 +1,4 @@
-<mujoco model="b2">
+<mujoco model="b2_description">
     <compiler angle="radian" autolimits="true"/>
 
     <default>
@@ -54,7 +54,7 @@
     </asset>
     <worldbody>
         
-        <body name="base_link" pos="0 0 0.8" childclass="b2">
+        <body name="base" pos="0 0 0.8" childclass="b2">
             <inertial pos="0.0212868 0.0045819 0.0106169" quat="0.00178111 0.73 -0.000262894 0.737438"
                       mass="40.8426" diaginertia="1.73786 1.66448 0.343734"/>
             
