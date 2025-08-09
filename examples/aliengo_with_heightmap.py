@@ -22,7 +22,7 @@ env = QuadrupedEnv(
 obs = env.reset()
 
 # adding the heightmap
-heightmap = HeightMap(n=5, dist_x=0.1, dist_y=0.1, mj_model=env.mjModel, mj_data=env.mjData)
+heightmap = HeightMap(num_rows=5, num_cols=5, dist_x=0.1, dist_y=0.1, mj_model=env.mjModel, mj_data=env.mjData)
 env.render()
 
 
@@ -53,7 +53,7 @@ while True:
         if is_terminated:
             print('Environment terminated')
         else:
-            print(f'reset {env.reset_env_counter}')
+            print('Environment truncated')
             env.reset(random=False)
     env.render()
 env.close()
