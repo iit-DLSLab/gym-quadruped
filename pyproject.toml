@@ -1,6 +1,6 @@
 [project]
 name = "gym-quadruped"
-version = "1.0.9"
+version = "1.1.0"
 description = "A gym environment for quadruped robots using MuJoCo physics engine."
 authors = [
     { name = "Daniel Ordoñez-Apraez", email = "daniels.ordonez@gmail.com" },
