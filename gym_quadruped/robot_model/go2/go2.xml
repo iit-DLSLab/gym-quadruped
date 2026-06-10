@@ -111,7 +111,7 @@
                         <geom pos="0 0 -0.213" mesh="foot" class="visual" material="black"/>
                         
                         <geom name="FL" class="collision" size="0.022" pos="-0.002 0 -0.213" priority="1" condim="6"
-                          friction="0.8 0.02 0.01">
+                          friction="0.8 0.02 0.01"/>
 
                     </body>
                 </body>
@@ -146,7 +146,7 @@
                         <geom pos="0 0 -0.213" mesh="foot" class="visual" material="black"/>
 
                         <geom name="FR" class="collision" size="0.022" pos="-0.002 0 -0.213" priority="1" condim="6"
-                          friction="0.8 0.02 0.01">
+                          friction="0.8 0.02 0.01"/>
 
                     </body>
                 </body>
@@ -182,7 +182,7 @@
                         <geom pos="0 0 -0.213" mesh="foot" class="visual" material="black"/>
 
                         <geom name="RL" class="collision" size="0.022" pos="-0.002 0 -0.213" priority="1" condim="6"
-                          friction="0.8 0.02 0.01">
+                          friction="0.8 0.02 0.01"/>
 
                     </body>
                 </body>
@@ -217,7 +217,7 @@
                         <geom pos="0 0 -0.213" mesh="foot" class="visual" material="black"/>
 
                         <geom name="RR" class="collision" size="0.022" pos="-0.002 0 -0.213" priority="1" condim="6"
-                          friction="0.8 0.02 0.01">
+                          friction="0.8 0.02 0.01"/>
 
                     </body>
                 </body>
