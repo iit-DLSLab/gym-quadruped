@@ -82,12 +82,7 @@
                               quat="0.707107 0 0.707107 0"/>
 
                         <!-- FL_foot only collision -->
-                        <!--geom name="FL" class="collision" size="0.0265" pos="0 0 -0.25"/-->
-
-                        <body name="FL_foot" pos="0 0 -0.25">
-                            <!-- FL_foot only collision -->
-                            <geom name="FL" class="collision" size="0.0265"/>
-                        </body>
+                        <geom name="FL" class="collision" size="0.0265" pos="0 0 -0.25">
 
                     </body>
                 </body>
@@ -125,12 +120,7 @@
                               quat="0.707107 0 0.707107 0"/>
 
                         <!-- FR_foot only collision -->
-                        <!--geom name="FR" class="collision" size="0.0265" pos="0 0 -0.25"/-->
-
-                        <body name="FR_foot" pos="0 0 -0.25">
-                            <!-- FR_foot only collision -->
-                            <geom name="FR" class="collision" size="0.0265"/>
-                        </body>
+                        <geom name="FR" class="collision" size="0.0265" pos="0 0 -0.25">
 
                     </body>
                 </body>
@@ -168,12 +158,8 @@
                               quat="0.707107 0 0.707107 0"/>
 
                         <!-- RL_foot only collision -->
-                        <!--geom name="RL" class="collision" size="0.0265" pos="0 0 -0.25"/-->
+                        <geom name="RL" class="collision" size="0.0265" pos="0 0 -0.25">
                         
-                        <body name="RL_foot" pos="0 0 -0.25">
-                            <!-- RL_foot only collision -->
-                            <geom name="RL" class="collision" size="0.0265"/>
-                        </body>
 
                     </body>
                 </body>
@@ -211,12 +197,7 @@
                               quat="0.707107 0 0.707107 0"/>
 
                         <!-- RR_foot only collision -->
-                        <!--geom name="RR" class="collision" size="0.0265" pos="0 0 -0.25"/-->
-
-                        <body name="RR_foot" pos="0 0 -0.25">
-                            <!-- RR_foot only collision -->
-                            <geom name="RR" class="collision" size="0.0265"/>
-                        </body>
+                        <geom name="RR" class="collision" size="0.0265" pos="0 0 -0.25">
 
                     </body>
                 </body>
