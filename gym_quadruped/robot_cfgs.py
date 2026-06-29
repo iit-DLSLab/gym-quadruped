@@ -52,6 +52,8 @@ def get_robot_config(robot_name: str) -> RobotConfig:
         cfg = RobotConfig(mjcf_filename='hyqreal2/hyqreal2.xml', hip_height=0.498)
     elif 'spot' in name:
         cfg = RobotConfig(mjcf_filename='spot/spot.xml', hip_height=0.46)
+    elif name == 'pegasus':
+        cfg = RobotConfig(mjcf_filename='pegasus/pegasus.xml', hip_height=0.5)
     else:
         raise ValueError(f'Unknown robot name: {robot_name}')
 
