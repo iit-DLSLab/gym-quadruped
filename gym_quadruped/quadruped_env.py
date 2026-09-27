@@ -211,6 +211,16 @@ class QuadrupedEnv(gym.Env):
         if self.robot_cfg.feet_geom_names is not None:
             self._find_feet_model_attrs(self.robot_cfg.feet_geom_names)
 
+        # Bodies of the legs (from the first leg joint's body down to the feet), ignored by the termination check ____
+        leg_root_ids = {self.mjModel.joint(joints[0]).bodyid[0] for joints in self.robot_cfg.leg_joints.values()}
+        self._legs_body_id = set()
+        for body_id in range(self.mjModel.nbody):
+            b = body_id
+            while b != 0 and b not in leg_root_ids:
+                b = self.mjModel.body_parentid[b]
+            if b != 0:
+                self._legs_body_id.add(body_id)
+
         # Action space: Torque values for each joint _________________________________________________________________
         tau_low, tau_high = (
             self.mjModel.actuator_forcerange[:, 0],
@@ -1222,7 +1232,7 @@ class QuadrupedEnv(gym.Env):
         return state_obs_dict
 
     def _check_for_invalid_contacts(self) -> [bool, dict]:
-        """Terminate on ground contact with any robot geometry other than the feet."""
+        """Terminate on ground contact with any robot geometry other than the legs and feet."""
         invalid_contacts = {}
         invalid_contact_detected = False
         for contact in self.mjData.contact:
@@ -1232,7 +1242,9 @@ class QuadrupedEnv(gym.Env):
 
             if 0 in [body1_id, body2_id]:  # World body ID is 0
                 robot_geom_id = contact.geom2 if body1_id == 0 else contact.geom1
-                if robot_geom_id not in self._feet_geom_id.to_list():  # Check if contact occurs with anything but the feet
+                robot_body_id = self.mjModel.geom_bodyid[robot_geom_id]
+                # Check if contact occurs with anything but the legs and feet
+                if robot_geom_id not in self._feet_geom_id.to_list() and robot_body_id not in self._legs_body_id:
                     # Get body names from body IDs
                     body1_name = mujoco.mj_id2name(self.mjModel, mujoco.mjtObj.mjOBJ_BODY, body1_id)
                     body2_name = mujoco.mj_id2name(self.mjModel, mujoco.mjtObj.mjOBJ_BODY, body2_id)

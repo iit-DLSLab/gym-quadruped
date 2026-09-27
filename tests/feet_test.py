@@ -91,6 +91,9 @@ def test_foot_contacts_and_force_direction(reverse):
         assert not env._check_for_invalid_contacts()[0]
         env.mjData.contact = [contact(calf)]
         assert not any(env.feet_contact_state()[0].to_list())
+        assert not env._check_for_invalid_contacts()[0]  # Leg contacts do not terminate the episode
+        base = next(i for i in range(model.ngeom) if model.geom_bodyid[i] == model.jnt_bodyid[0])
+        env.mjData.contact = [contact(base)]
         assert env._check_for_invalid_contacts()[0]
     finally:
         env.close()
