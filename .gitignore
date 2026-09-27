@@ -186,3 +186,6 @@ cython_debug/
 /gym_quadruped/utils/mujoco/assets/*
 !/gym_quadruped/utils/mujoco/assets/scene_flat.xml
 
+
+# Pegasus assets
+/gym_quadruped/robot_model/pegasus/*

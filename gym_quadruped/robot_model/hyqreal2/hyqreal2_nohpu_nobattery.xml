@@ -55,10 +55,7 @@
             <geom class="collision" type="box" size="0.15 0.015 0.02" pos="0.2 0.01 0." quat="0.9962 0 0 -0.0872" />
 
             <!-- FL foot collision -->
-            <!-- Foot inertia is already included in the calf inertial; avoid adding mass. -->
-            <body name="FL_foot" pos="0.38 0 0">
-                <geom class="collision" type="sphere" name="FL" size="0.032" quat="0.5 0.5 -0.5 -0.5" pos="0 0 0" mass="0"/>
-            </body>
+            <geom class="collision" type="sphere" name="FL" size="0.032" pos="0.38 0 0" quat="0.5 0.5 -0.5 -0.5"/>
           </body>
         </body>
       </body>
@@ -88,9 +85,7 @@
             <geom class="collision" type="box" size="0.15 0.015 0.02" pos="0.2 0.01 0." quat="0.9962 0 0 -0.0872" />
 
             <!-- FR foot collision -->
-            <body name="FR_foot" pos="0.38 0 0">
-                <geom class="collision" type="sphere" name="FR" size="0.032" quat="0.5 0.5 -0.5 -0.5" pos="0 0 0" mass="0"/>
-            </body>
+            <geom class="collision" type="sphere" name="FR" size="0.032" pos="0.38 0 0" quat="0.5 0.5 -0.5 -0.5"/>
           </body>
         </body>
       </body>
@@ -121,9 +116,7 @@
             <geom class="collision" type="box" size="0.15 0.015 0.02" pos="0.2 0.01 0." quat="0.9962 0 0 -0.0872" />
 
             <!-- RL foot collision -->
-            <body name="RL_foot" pos="0.38 0 0">
-                <geom class="collision" type="sphere" name="RL" size="0.032" quat="0.5 0.5 -0.5 -0.5" pos="0 0 0" mass="0"/>
-            </body>
+            <geom class="collision" type="sphere" name="RL" size="0.032" pos="0.38 0 0" quat="0.5 0.5 -0.5 -0.5"/>
           </body>
         </body>
       </body>
@@ -152,9 +145,7 @@
             <geom class="collision" type="box" size="0.15 0.015 0.02" pos="0.2 0.01 0." quat="0.9962 0 0 -0.0872" />
 
             <!-- RR foot collision -->
-            <body name="RR_foot" pos="0.38 0 0">
-                <geom class="collision" type="sphere" name="RR" size="0.032" quat="0.5 0.5 -0.5 -0.5" pos="0 0 0" mass="0"/>
-            </body>
+            <geom class="collision" type="sphere" name="RR" size="0.032" pos="0.38 0 0" quat="0.5 0.5 -0.5 -0.5"/>
           </body>
         </body>
       </body>

@@ -610,7 +610,9 @@ class QuadrupedEnv(gym.Env):
                 - RL: (3,) position of the RL foot in the specified frame.
         """
         if any(x is None for x in self._feet_geom_id.to_list()):
-            raise ValueError('Please configure `RobotConfig.feet_geom_names` to compute feet positions.')
+            raise ValueError(
+                'Please provide the `feet_geom_name` argument in the Env constructor to compute feet positions.'
+            )
 
         if frame == 'world':
             X = np.eye(4)
@@ -680,8 +682,9 @@ class QuadrupedEnv(gym.Env):
         """Compute the Jacobians of the feet positions.
 
         This function computes the translational and rotational Jacobians of the feet positions. Each feet position is
-        defined as the position of its configured contact geometry. The attached body is resolved from the model,
-        including when the geometry belongs to a dedicated fixed foot body.
+        defined as the position of the geometry corresponding to each foot, passed in the `feet_geom_name` argument of
+        the constructor. The body to which each feet point/geometry is attached to is assumed to be the one passed in
+        the `feet_body_name` argument of the constructor.
 
         The Jacobians returned can be used to compute the relationship between joint velocities and feet velocities,
         such that if r_dot_FL is the velocity of the FL foot in the world frame, then:
@@ -707,7 +710,9 @@ class QuadrupedEnv(gym.Env):
                 - The second LegsAttr object contains the rotational Jacobians.
         """
         if any(x is None for x in self._feet_body_id.to_list()):
-            raise ValueError('Please configure `RobotConfig.feet_geom_names` to compute feet Jacobians.')
+            raise ValueError(
+                'Please provide the `feet_geom_name` argument in the Env constructor to compute feet Jacobians.'
+            )
 
         if frame == 'world':
             R = np.eye(3)
@@ -716,7 +721,7 @@ class QuadrupedEnv(gym.Env):
         else:
             raise ValueError(f"Invalid frame: {frame} != 'world' or 'base'")
         feet_trans_jac = LegsAttr(*[np.zeros((3, self.mjModel.nv)) for _ in range(4)])
-        feet_rot_jac = LegsAttr(*[np.zeros((3, self.mjModel.nv)) if return_rot_jac else None for _ in range(4)])
+        feet_rot_jac = LegsAttr(*[np.zeros((3, self.mjModel.nv)) if not return_rot_jac else None for _ in range(4)])
         feet_pos = self.feet_pos(frame='world')  # Mujoco mj_jac expects the point in global coordinates.
 
         for leg_name in ['FR', 'FL', 'RR', 'RL']:
@@ -738,7 +743,9 @@ class QuadrupedEnv(gym.Env):
         """Compute the Jacobians derivative of the feet positions.
 
         This function computes the translational and rotational Jacobians derivative of the feet positions. Each feet
-        position is defined by its configured contact geometry. The attached body is resolved from the model.
+        position is defined as the position of the geometry corresponding to each foot, passed in the `feet_geom_name`
+        argument of the constructor. The body to which each feet point/geometry is attached to is assumed to be the one
+        passed in the `feet_body_name` argument of the constructor.
 
 
         Args:
@@ -760,7 +767,9 @@ class QuadrupedEnv(gym.Env):
                 - The second LegsAttr object contains the rotational Jacobians.
         """
         if any(x is None for x in self._feet_body_id.to_list()):
-            raise ValueError('Please configure `RobotConfig.feet_geom_names` to compute feet Jacobians.')
+            raise ValueError(
+                'Please provide the `feet_geom_name` argument in the Env constructor to compute feet Jacobians.'
+            )
 
         if frame == 'world':
             R = np.eye(3)
@@ -769,7 +778,7 @@ class QuadrupedEnv(gym.Env):
         else:
             raise ValueError(f"Invalid frame: {frame} != 'world' or 'base'")
         feet_trans_jac_dot = LegsAttr(*[np.zeros((3, self.mjModel.nv)) for _ in range(4)])
-        feet_rot_jac_dot = LegsAttr(*[np.zeros((3, self.mjModel.nv)) if return_rot_jac else None for _ in range(4)])
+        feet_rot_jac_dot = LegsAttr(*[np.zeros((3, self.mjModel.nv)) if not return_rot_jac else None for _ in range(4)])
         feet_pos = self.feet_pos(frame='world')  # Mujoco mj_jac expects the point in global coordinates.
 
         for leg_name in ['FR', 'FL', 'RR', 'RL']:
@@ -817,7 +826,9 @@ class QuadrupedEnv(gym.Env):
                     - RR: (3,) The total ground reaction force acting on the RR foot in the specified frame.
         """
         if any(x is None for x in self._feet_body_id.to_list()):
-            raise ValueError('Please configure `RobotConfig.feet_geom_names` to compute contact forces.')
+            raise ValueError(
+                'Please provide the `feet_geom_name` argument in the Env constructor to compute contact forces.'
+            )
 
         contact_state = LegsAttr(FL=False, FR=False, RL=False, RR=False)
         feet_contacts = LegsAttr(FL=[], FR=[], RL=[], RR=[])
@@ -828,10 +839,10 @@ class QuadrupedEnv(gym.Env):
             body2_id = self.mjModel.geom_bodyid[contact.geom2]
 
             if 0 in [body1_id, body2_id]:  # World body ID is 0
-                foot_geom_id = contact.geom2 if body1_id == 0 else contact.geom1
-                if foot_geom_id in self._feet_geom_id.to_list():  # Check if contact occurs with the feet
+                second_id = body2_id if body1_id == 0 else body1_id
+                if second_id in self._feet_body_id.to_list():  # Check if contact occurs with the feet
                     for leg_name in ['FL', 'FR', 'RL', 'RR']:
-                        if foot_geom_id == self._feet_geom_id[leg_name]:
+                        if second_id == self._feet_body_id[leg_name]:
                             contact_state[leg_name] = True
                             feet_contacts[leg_name].append(contact)
                             if ground_reaction_forces:  # Store the contact forces
@@ -841,8 +852,6 @@ class QuadrupedEnv(gym.Env):
                                 mujoco.mj_contactForce(self.mjModel, self.mjData, id=contact_id, result=force_c)
                                 # Transform the contact force to the world frame
                                 force_w = R_c.T @ force_c[:3]
-                                if body2_id == 0:  # MuJoCo returns the force acting on geom2.
-                                    force_w = -force_w
                                 feet_contact_forces[leg_name].append(force_w)
 
         if ground_reaction_forces:
@@ -913,7 +922,7 @@ class QuadrupedEnv(gym.Env):
         com = np.zeros(3)
         for i in range(self.mjModel.nbody):
             body_mass = self.mjModel.body_mass[i]
-            body_com = self.mjData.xipos[i]
+            body_com = self.mjData.subtree_com[i]
             com += body_mass * body_com
             total_mass += body_mass
         com /= total_mass
@@ -928,7 +937,7 @@ class QuadrupedEnv(gym.Env):
         # kinetic_energy = self.mjData.energy[1]
 
         M = np.zeros((self.mjModel.nv, self.mjModel.nv))
-        mujoco.mj_fullM(self.mjModel, self.mjData, M)
+        mujoco.mj_fullM(self.mjModel, self.mjData, mass_matrix)
         kinetic_energy = 1 / 2 * self.mjData.qvel.T @ M @ self.mjData.qvel
 
         return kinetic_energy
@@ -942,7 +951,7 @@ class QuadrupedEnv(gym.Env):
         # Allocate memory for the mass matrix
         Mq = np.zeros((self.mjModel.nv, self.mjModel.nv))
         # Convert the sparse mass matrix to a dense one
-        mujoco.mj_fullM(self.mjModel, self.mjData, Mq)
+        mujoco.mj_fullM(self.mjModel, self.mjData, mass_matrix)
 
         gen_forces = Mq @ self.mjData.qacc  # U(q, dq, F) = M(q) ddq
         work = np.dot(gen_forces, self.mjData.qvel)
@@ -1217,7 +1226,7 @@ class QuadrupedEnv(gym.Env):
         return state_obs_dict
 
     def _check_for_invalid_contacts(self) -> [bool, dict]:
-        """Terminate on ground contact with any robot geometry other than the feet."""
+        """Env termination occurs when a contact is detected on the robot's base."""
         invalid_contacts = {}
         invalid_contact_detected = False
         for contact in self.mjData.contact:
@@ -1226,8 +1235,8 @@ class QuadrupedEnv(gym.Env):
             body2_id = self.mjModel.geom_bodyid[contact.geom2]
 
             if 0 in [body1_id, body2_id]:  # World body ID is 0
-                robot_geom_id = contact.geom2 if body1_id == 0 else contact.geom1
-                if robot_geom_id not in self._feet_geom_id.to_list():  # Check if contact occurs with anything but the feet
+                second_id = body2_id if body1_id == 0 else body1_id
+                if second_id not in self._feet_body_id.to_list():  # Check if contact occurs with anything but the feet
                     # Get body names from body IDs
                     body1_name = mujoco.mj_id2name(self.mjModel, mujoco.mjtObj.mjOBJ_BODY, body1_id)
                     body2_name = mujoco.mj_id2name(self.mjModel, mujoco.mjtObj.mjOBJ_BODY, body2_id)
@@ -1349,7 +1358,7 @@ class QuadrupedEnv(gym.Env):
         return copy.copy(self._init_args)
 
     def _find_feet_model_attrs(self, feet_geom_name):
-        _all_geoms = [mujoco.mj_id2name(self.mjModel, mujoco.mjtObj.mjOBJ_GEOM, i) for i in range(self.mjModel.ngeom)]
+        _all_geoms = [mujoco.mj_id2name(self.mjModel, i, mujoco.mjtObj.mjOBJ_GEOM) for i in range(self.mjModel.ngeom)]
         for lef_name in ['FR', 'FL', 'RR', 'RL']:
             foot_geom_id = mujoco.mj_name2id(self.mjModel, mujoco.mjtObj.mjOBJ_GEOM, feet_geom_name[lef_name])
             assert foot_geom_id != -1, f'Foot GEOM {feet_geom_name[lef_name]} not found in {_all_geoms}.'

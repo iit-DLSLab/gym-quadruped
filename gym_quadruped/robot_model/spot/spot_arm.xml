@@ -111,10 +111,7 @@
             <joint name="fl_kn" axis="0 1 0" range="-2.7929 -0.254402"/>
             <geom material="BlackAbs" mesh="front_left_lower_leg" class="visual"/>
             <geom mesh="left_lower_leg_collision" class="collision"/>
-            <!-- Foot inertia is already included in the calf inertial; avoid adding mass. -->
-            <body name="FL_foot" pos="0 0 -0.3365">
-                <geom name="FL" class="foot" pos="0 0 0" mass="0"/>
-            </body>
+            <geom name="FL" class="foot"/>
           </body>
         </body>
       </body>
@@ -135,9 +132,7 @@
             <joint name="fr_kn" axis="0 1 0" range="-2.7929 -0.255648"/>
             <geom material="BlackAbs" mesh="front_right_lower_leg" class="visual"/>
             <geom mesh="right_lower_leg_collision" class="collision"/>
-            <body name="FR_foot" pos="0 0 -0.3365">
-                <geom name="FR" class="foot" pos="0 0 0" mass="0"/>
-            </body>
+            <geom name="FR" class="foot"/>
           </body>
         </body>
       </body>
@@ -158,9 +153,7 @@
             <joint name="hl_kn" axis="0 1 0" range="-2.7929 -0.247067"/>
             <geom material="BlackAbs" mesh="rear_left_lower_leg" class="visual"/>
             <geom mesh="left_lower_leg_collision" class="collision"/>
-            <body name="HL_foot" pos="0 0 -0.3365">
-                <geom name="HL" class="foot" pos="0 0 0" mass="0"/>
-            </body>
+            <geom name="HL" class="foot"/>
           </body>
         </body>
       </body>
@@ -181,9 +174,7 @@
             <joint name="hr_kn" axis="0 1 0" range="-2.7929 -0.248282"/>
             <geom material="BlackAbs" mesh="rear_left_lower_leg" class="visual"/>
             <geom mesh="right_lower_leg_collision" class="collision"/>
-            <body name="HR_foot" pos="0 0 -0.3365">
-                <geom name="HR" class="foot" pos="0 0 0" mass="0"/>
-            </body>
+            <geom name="HR" class="foot"/>
           </body>
         </body>
       </body>
