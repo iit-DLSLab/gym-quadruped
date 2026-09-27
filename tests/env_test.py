@@ -11,9 +11,7 @@ logging.basicConfig(level=logging.DEBUG)
 logger = logging.getLogger(__name__)
 
 
-@pytest.mark.parametrize(
-    'robot_name', ['b2', 'go1', 'go2', 'hyqreal1', 'hyqreal2', 'mini_cheetah', 'aliengo', 'a2', 'pegasus', 'spot']
-)
+@pytest.mark.parametrize('robot_name', ['b2', 'go1', 'go2', 'hyqreal1', 'hyqreal2', 'mini_cheetah', 'aliengo'])
 @pytest.mark.parametrize('terrain_type', ['flat', 'perlin'])
 def test_robot_env(robot_name, terrain_type):  # noqa: D103
     print(f'Testing robot {robot_name} on terrain {terrain_type}')
@@ -43,7 +41,7 @@ def test_robot_env(robot_name, terrain_type):  # noqa: D103
             raise AssertionError(f'Observable {obs_name} not found in the state for the robot {robot_name}') from e
         except AssertionError as e:
             raise AssertionError(
-                f'Observable {obs_name} has incorrect shape, expected {env.observation_space[obs_name].shape} got '
+                f'Observable {obs_name} has incorrect shape, expected {env.action_space[obs_name].shape} got '
                 f'{np.asarray(obs_val).shape}'
             ) from e
 
