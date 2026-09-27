@@ -116,7 +116,10 @@
                         <geom class="visual" mesh="calf"/>
                         <geom class="calf1"/>
                         <geom class="calf2"/>
-                        <geom name="FL" class="foot"/>
+                        <!-- Foot inertia is already included in the calf inertial; avoid adding mass. -->
+                        <body name="FL_foot" pos="0 0 -0.213">
+                            <geom name="FL" class="foot" pos="0 0 0" mass="0"/>
+                        </body>
                         <site name="FL" pos="0 0 -0.213" type="sphere" size="0.023" group="5"/>
                     </body>
                 </body>
@@ -145,7 +148,9 @@
                         <geom class="visual" mesh="calf"/>
                         <geom class="calf1"/>
                         <geom class="calf2"/>
-                        <geom name="FR" class="foot"/>
+                        <body name="FR_foot" pos="0 0 -0.213">
+                            <geom name="FR" class="foot" pos="0 0 0" mass="0"/>
+                        </body>
                         <site name="FR" pos="0 0 -0.213" type="sphere" size="0.023" group="5"/>
                     </body>
                 </body>
@@ -175,7 +180,9 @@
                         <geom class="visual" mesh="calf"/>
                         <geom class="calf1"/>
                         <geom class="calf2"/>
-                        <geom name="RL" class="foot"/>
+                        <body name="RL_foot" pos="0 0 -0.213">
+                            <geom name="RL" class="foot" pos="0 0 0" mass="0"/>
+                        </body>
                         <site name="RL" pos="0 0 -0.213" type="sphere" size="0.023" group="5"/>
                     </body>
                 </body>
@@ -205,7 +212,9 @@
                         <geom class="visual" mesh="calf"/>
                         <geom class="calf1"/>
                         <geom class="calf2"/>
-                        <geom name="RR" class="foot"/>
+                        <body name="RR_foot" pos="0 0 -0.213">
+                            <geom name="RR" class="foot" pos="0 0 0" mass="0"/>
+                        </body>
                         <site name="RR" pos="0 0 -0.213" type="sphere" size="0.023" group="5"/>
                     </body>
                 </body>
