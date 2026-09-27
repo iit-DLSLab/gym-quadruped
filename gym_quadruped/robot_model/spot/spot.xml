@@ -94,7 +94,10 @@
             <joint name="FL_calf_joint" axis="0 1 0" range="-2.7929 -0.254402"/>
             <geom material="BlackAbs" mesh="front_left_lower_leg" class="visual"/>
             <geom mesh="left_lower_leg_collision" class="collision"/>
-            <geom name="FL" class="foot"/>
+            <!-- Foot inertia is already included in the calf inertial; avoid adding mass. -->
+            <body name="FL_foot" pos="0 0 -0.3365">
+                <geom name="FL" class="foot" pos="0 0 0" mass="0"/>
+            </body>
           </body>
         </body>
       </body>
@@ -118,7 +121,9 @@
             <joint name="FR_calf_joint" axis="0 1 0" range="-2.7929 -0.255648"/>
             <geom material="BlackAbs" mesh="front_right_lower_leg" class="visual"/>
             <geom mesh="right_lower_leg_collision" class="collision"/>
-            <geom name="FR" class="foot"/>
+            <body name="FR_foot" pos="0 0 -0.3365">
+                <geom name="FR" class="foot" pos="0 0 0" mass="0"/>
+            </body>
           </body>
         </body>
       </body>
@@ -142,7 +147,9 @@
             <joint name="RL_calf_joint" axis="0 1 0" range="-2.7929 -0.247067"/>
             <geom material="BlackAbs" mesh="rear_left_lower_leg" class="visual"/>
             <geom mesh="left_lower_leg_collision" class="collision"/>
-            <geom name="RL" class="foot"/>
+            <body name="RL_foot" pos="0 0 -0.3365">
+                <geom name="RL" class="foot" pos="0 0 0" mass="0"/>
+            </body>
           </body>
         </body>
       </body>
@@ -166,7 +173,9 @@
             <joint name="RR_calf_joint" axis="0 1 0" range="-2.7929 -0.248282"/>
             <geom material="BlackAbs" mesh="rear_left_lower_leg" class="visual"/>
             <geom mesh="right_lower_leg_collision" class="collision"/>
-            <geom name="RR" class="foot"/>
+            <body name="RR_foot" pos="0 0 -0.3365">
+                <geom name="RR" class="foot" pos="0 0 0" mass="0"/>
+            </body>
           </body>
         </body>
       </body>

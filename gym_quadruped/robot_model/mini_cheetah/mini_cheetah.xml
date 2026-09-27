@@ -75,7 +75,10 @@
                         <geom class="collision" quat="3.26795e-07 0 1 0" type="mesh" mesh="mini_lower_link"/>
 
                         <!-- FL foot collision -->
-                        <geom class="collision" name="FL" size="0.025" pos="0 0 -0.18"/>
+                        <!-- Foot inertia is already included in the calf inertial; avoid adding mass. -->
+                        <body name="FL_foot" pos="0 0 -0.18">
+                            <geom class="collision" name="FL" size="0.025" pos="0 0 0" mass="0"/>
+                        </body>
 
                     </body>
                 </body>
@@ -111,7 +114,9 @@
                         <geom class="collision" quat="3.26795e-07 0 1 0" type="mesh" mesh="mini_lower_link"/>
 
                         <!-- FR foot collision -->
-                        <geom class="collision" name="FR" size="0.025" pos="0 0 -0.18"/>
+                        <body name="FR_foot" pos="0 0 -0.18">
+                            <geom class="collision" name="FR" size="0.025" pos="0 0 0" mass="0"/>
+                        </body>
 
                     </body>
                 </body>
@@ -147,7 +152,9 @@
                         <geom class="collision" quat="3.26795e-07 0 1 0" type="mesh" mesh="mini_lower_link"/>
 
                         <!-- RL foot collision mesh -->
-                        <geom class="collision" name="RL" size="0.025" pos="0 0 -0.18"/>
+                        <body name="RL_foot" pos="0 0 -0.18">
+                            <geom class="collision" name="RL" size="0.025" pos="0 0 0" mass="0"/>
+                        </body>
 
                     </body>
                 </body>
@@ -181,7 +188,9 @@
                         <geom class="collision" quat="3.26795e-07 0 1 0" type="mesh" mesh="mini_lower_link"/>
 
                         <!-- RR foot collision -->
-                        <geom class="collision" name="RR" size="0.025" pos="0 0 -0.18"/>
+                        <body name="RR_foot" pos="0 0 -0.18">
+                            <geom class="collision" name="RR" size="0.025" pos="0 0 0" mass="0"/>
+                        </body>
 
                     </body>
                 </body>
