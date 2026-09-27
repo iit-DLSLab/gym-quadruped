@@ -44,6 +44,8 @@ def get_robot_config(robot_name: str) -> RobotConfig:
         cfg = RobotConfig(mjcf_filename='go2/go2.xml', hip_height=0.28)
     elif name == 'aliengo':
         cfg = RobotConfig(mjcf_filename='aliengo/aliengo.xml', hip_height=0.35)
+    elif name == 'a2':
+        cfg = RobotConfig(mjcf_filename='a2/a2.xml', hip_height=0.4)
     elif name == 'b2':
         cfg = RobotConfig(mjcf_filename='b2/b2.xml', hip_height=0.485)
     elif 'hyqreal1' in name:
