@@ -541,25 +541,30 @@ class QuadrupedEnv(gym.Env):
             raise ValueError(f"Invalid frame: {frame} != 'world' or 'base'")
 
     def get_base_inertia(self) -> np.ndarray:
-        """Returns the reflected rotational inertia of the robot's base at the current configuration in world frame.
+        """Returns the whole-body (locked joints) rotational inertia about the robot's CoM, in the base frame.
 
-        Args:
-        ----
-            model: The MuJoCo model.
-            data: The MuJoCo data.
+        This is the inertia of the Single Rigid Body Model at the current joint configuration.
 
         Returns:
         -------
-            np.ndarray: The reflected rotational inertia matrix in the world frame.
+            np.ndarray: (3, 3) rotational inertia matrix about the CoM, expressed in the base frame.
         """
         # Initialize the full mass matrix
         mass_matrix = np.zeros((self.mjModel.nv, self.mjModel.nv))
         mujoco.mj_fullM(self.mjModel, self.mjData, mass_matrix)
 
-        # Extract the 3x3 rotational inertia matrix of the base (assuming the base has 6 DoFs)
-        inertia_B_at_qpos = mass_matrix[3:6, 3:6]
+        # The free-joint angular DoFs are expressed in the base frame and rotate about the base origin, so this block
+        # is the composite inertia about the base origin (not the CoM), in base frame.
+        # Armature (if inherited by the free joint from a default class) is not part of the rigid-body inertia.
+        inertia_at_base_origin = mass_matrix[3:6, 3:6] - np.diag(self.mjModel.dof_armature[3:6])
 
-        return inertia_B_at_qpos
+        # Parallel axis theorem to move it to the whole-body CoM
+        total_mass = np.sum(self.mjModel.body_mass)
+        X_B = self.base_configuration
+        r = X_B[0:3, 0:3].T @ (self.com - X_B[0:3, 3])  # base origin -> CoM, in base frame
+        inertia_at_com = inertia_at_base_origin - total_mass * (np.dot(r, r) * np.eye(3) - np.outer(r, r))
+
+        return inertia_at_com
 
     def hip_positions(self, frame='world') -> LegsAttr:
         """Get the hip positions in the specified frame.

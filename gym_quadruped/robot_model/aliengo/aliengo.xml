@@ -86,7 +86,7 @@
 
                         <body name="FL_foot" pos="0 0 -0.25">
                             <!-- FL_foot only collision -->
-                            <geom name="FL" class="collision" size="0.0265"/>
+                            <geom name="FL" class="collision" size="0.0265" mass="0"/>
                         </body>
 
                     </body>
@@ -129,7 +129,7 @@
 
                         <body name="FR_foot" pos="0 0 -0.25">
                             <!-- FR_foot only collision -->
-                            <geom name="FR" class="collision" size="0.0265"/>
+                            <geom name="FR" class="collision" size="0.0265" mass="0"/>
                         </body>
 
                     </body>
@@ -172,7 +172,7 @@
                         
                         <body name="RL_foot" pos="0 0 -0.25">
                             <!-- RL_foot only collision -->
-                            <geom name="RL" class="collision" size="0.0265"/>
+                            <geom name="RL" class="collision" size="0.0265" mass="0"/>
                         </body>
 
                     </body>
@@ -215,7 +215,7 @@
 
                         <body name="RR_foot" pos="0 0 -0.25">
                             <!-- RR_foot only collision -->
-                            <geom name="RR" class="collision" size="0.0265"/>
+                            <geom name="RR" class="collision" size="0.0265" mass="0"/>
                         </body>
 
                     </body>
