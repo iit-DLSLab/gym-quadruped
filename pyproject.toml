@@ -124,3 +124,10 @@ exclude = [
     "*.pkl", # Exclude pickle files
     "__pycache__/**", # Exclude Python cache files
 ]
+
+# Pin core metadata to 2.4: newer hatchling emits 2.5, which twine in the PyPI publish action rejects.
+[tool.hatch.build.targets.wheel]
+core-metadata-version = "2.4"
+
+[tool.hatch.build.targets.sdist]
+core-metadata-version = "2.4"
