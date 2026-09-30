@@ -1,6 +1,6 @@
 [project]
 name = "gym-quadruped"
-version = "1.1.6"
+version = "1.1.7"
 description = "A gym environment for quadruped robots using MuJoCo physics engine."
 authors = [
     { name = "Daniel Ordoñez-Apraez", email = "daniels.ordonez@gmail.com" },
@@ -33,7 +33,6 @@ dependencies = [
     "h5py",
     "gymnasium",
     "pytest",
-    "gym-quadruped>=1.0.2",
 ]
 
 [tool.ruff]
